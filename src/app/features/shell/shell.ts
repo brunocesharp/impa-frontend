@@ -55,8 +55,12 @@ export class Shell {
   ];
 
   protected async sair(): Promise<void> {
-    await this.auth.sair();
-    await this.router.navigateByUrl('/login');
+    try {
+      await this.auth.sair();
+    } finally {
+      // Sempre volta ao login, mesmo que o servidor recuse (sessão já encerrada).
+      await this.router.navigateByUrl('/login');
+    }
   }
 
   private tituloDaRotaAtual(): string {

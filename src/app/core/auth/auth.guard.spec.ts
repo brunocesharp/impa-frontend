@@ -17,7 +17,9 @@ describe('autenticadoGuard', () => {
   afterEach(() => http.verify());
 
   async function executarGuard(): Promise<boolean | UrlTree> {
-    const resultado = TestBed.runInInjectionContext(() => autenticadoGuard({} as never, {} as never));
+    const resultado = TestBed.runInInjectionContext(() =>
+      autenticadoGuard({} as never, { url: '/caixa' } as never),
+    );
     // O guard consulta a sessão no servidor antes de decidir.
     await Promise.resolve();
     return resultado as Promise<boolean | UrlTree>;
@@ -40,5 +42,24 @@ describe('autenticadoGuard', () => {
       .flush({ usuario: 'admin', nome: 'Administrador', perfil: 'Administrador', permissoes: [] });
 
     expect(await decisao).toBe(true);
+  });
+
+  it('API indisponível (erro diferente de 401) leva à tela de nova tentativa, lembrando o destino', async () => {
+    const decisao = executarGuard();
+    http.expectOne('/api/auth/me').flush(null, { status: 503, statusText: 'Service Unavailable' });
+
+    const resultado = await decisao;
+
+    expect(resultado instanceof UrlTree).toBe(true);
+    expect(TestBed.inject(Router).serializeUrl(resultado as UrlTree)).toBe('/indisponivel?volta=%2Fcaixa');
+  });
+
+  it('sem rede (status 0) também leva à tela de nova tentativa', async () => {
+    const decisao = executarGuard();
+    http.expectOne('/api/auth/me').error(new ProgressEvent('error'));
+
+    const resultado = await decisao;
+
+    expect(TestBed.inject(Router).serializeUrl(resultado as UrlTree)).toBe('/indisponivel?volta=%2Fcaixa');
   });
 });

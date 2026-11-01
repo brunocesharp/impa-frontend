@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import { NonNullableFormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AbstractControl, NonNullableFormBuilder, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { ErrorStateMatcher } from '@angular/material/core';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -24,8 +24,8 @@ export class Login {
   protected readonly tema = inject(TemaService);
 
   protected readonly formulario = inject(NonNullableFormBuilder).group({
-    usuario: ['', Validators.required],
-    senha: ['', Validators.required],
+    usuario: ['', naoEmBranco],
+    senha: ['', naoEmBranco],
   });
 
   /** Erro de campo só depois de tocado (o envio vazio marca todos): não acusa a senha limpa após recusa. */
@@ -36,12 +36,20 @@ export class Login {
   protected readonly enviando = signal(false);
   protected readonly erro = signal<string | null>(null);
 
+  /**
+   * Consulta inicial da sessão: entrega o token XSRF que o login exige e leva quem já está na sessão
+   * direto para o início. `true` quando o servidor respondeu (com ou sem sessão).
+   */
+  private sessaoInicial: Promise<boolean>;
+
   constructor() {
-    // Consulta a sessão ao abrir: entrega o token XSRF que o login exige
-    // e leva quem já está na sessão direto para o início.
-    void this.auth.carregarSessao().then((sessao) => {
-      if (sessao) void this.router.navigateByUrl('/');
-    });
+    this.sessaoInicial = this.auth.carregarSessao().then(
+      (sessao) => {
+        if (sessao) void this.router.navigateByUrl('/');
+        return true;
+      },
+      () => false,
+    );
   }
 
   protected async entrar(): Promise<void> {
@@ -53,10 +61,20 @@ export class Login {
     this.enviando.set(true);
     this.erro.set(null);
     try {
+      // Envio rápido (preenchimento automático, rede lenta) espera o token; se a consulta inicial falhou, refaz.
+      await this.garantirTokenXsrf();
+
       const { usuario, senha } = this.formulario.getRawValue();
       const resultado = await this.auth.entrar(usuario, senha);
       if (resultado.ok) {
         await this.router.navigateByUrl('/');
+      } else if (resultado.campos) {
+        // Validação do servidor: a mensagem vai para o campo.
+        for (const [campo, mensagem] of Object.entries(resultado.campos)) {
+          const controle = this.formulario.controls[campo as keyof typeof this.formulario.controls];
+          controle.setErrors({ servidor: mensagem });
+          controle.markAsTouched();
+        }
       } else {
         this.erro.set(resultado.mensagem);
         // Limpa a senha sem acusar "Informe a senha": o erro a mostrar é o da credencial.
@@ -70,4 +88,15 @@ export class Login {
       this.enviando.set(false);
     }
   }
+
+  private async garantirTokenXsrf(): Promise<void> {
+    if (await this.sessaoInicial) return;
+    this.sessaoInicial = this.auth.carregarSessao().then(() => true, () => false);
+    if (!(await this.sessaoInicial)) throw new Error('Servidor indisponível');
+  }
+}
+
+/** Obrigatório e não só espaços (o servidor recusaria com 400). */
+function naoEmBranco(controle: AbstractControl<string>): ValidationErrors | null {
+  return controle.value?.trim() ? null : { required: true };
 }

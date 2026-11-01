@@ -23,6 +23,8 @@
         />
         @if (formulario.controls.usuario.hasError('required')) {
           <mat-error>Informe o usuário</mat-error>
+        } @else if (formulario.controls.usuario.getError('servidor'); as mensagem) {
+          <mat-error>{{ mensagem }}</mat-error>
         }
       </mat-form-field>
 
@@ -37,6 +39,8 @@
         />
         @if (formulario.controls.senha.hasError('required')) {
           <mat-error>Informe a senha</mat-error>
+        } @else if (formulario.controls.senha.getError('servidor'); as mensagem) {
+          <mat-error>{{ mensagem }}</mat-error>
         }
       </mat-form-field>
 

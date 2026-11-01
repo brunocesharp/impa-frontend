@@ -14,9 +14,28 @@ src/
     ├── core/auth/             # AuthService (sessão de /api/auth/me), guards, interceptor de 401
     ├── core/menu/             # itens do menu e a permissão de cada um
     ├── core/tema/             # TemaService: claro / escuro / do sistema
-    └── features/              # login (com a cena espacial), shell, início, em construção
+    └── features/              # login (com a cena espacial), shell, início, em construção, indisponível
 public/brand/                  # logotipos e símbolo (de docs/impa/direcao-arte/assets)
+public/icons/, favicon.ico     # ícones do PWA a partir do símbolo (scripts/gerar-icones.py)
 e2e/                           # testes ponta a ponta (Playwright)
+```
+
+### Convenção de pastas (desvio das skills `angular-*`)
+
+As skills `angular-core-layer`/`angular-feature-layer` organizam o `core/` por **tipo de artefato**
+(`services/`, `interceptors/`, `guards/`, `models/`...). Aqui o `core/` é organizado por **assunto**
+(`core/auth/` com service, guards, interceptor e modelo juntos; `core/menu/`; `core/tema/`), e cada tela fica em
+`features/{tela}/`, sem NgRx nem SignalR. Motivo: na story 1-1 cada assunto tem poucos arquivos, e juntá-los
+deixa o padrão de ponta a ponta mais fácil de seguir. Registrado na story 1-1 (revisão 1, R11); rever quando
+o `core/` crescer ou quando entrar estado global.
+
+## Ícones
+
+Os ícones do PWA (`any` e `maskable`), o `apple-touch-icon` e o `favicon.ico` são gerados a partir de
+`public/brand/simbolo.png` (cometa sobre o fundo Espaço `#121318`):
+
+```bash
+python scripts/gerar-icones.py public    # requer Pillow
 ```
 
 ## Rodar localmente

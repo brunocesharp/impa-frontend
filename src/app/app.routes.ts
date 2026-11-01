@@ -9,6 +9,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/login/login').then((m) => m.Login),
   },
   {
+    path: 'indisponivel',
+    title: 'Sem conexão · IMPA',
+    loadComponent: () => import('./features/indisponivel/indisponivel').then((m) => m.Indisponivel),
+  },
+  {
     path: '',
     canActivate: [autenticadoGuard],
     loadComponent: () => import('./features/shell/shell').then((m) => m.Shell),

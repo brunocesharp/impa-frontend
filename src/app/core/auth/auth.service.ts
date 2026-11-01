@@ -3,7 +3,16 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ErroApi, MENSAGEM_CREDENCIAL_INVALIDA, Sessao } from './sessao';
 
-export type ResultadoEntrar = { ok: true } | { ok: false; mensagem: string };
+export type CampoLogin = 'usuario' | 'senha';
+
+/**
+ * Resultado do login. Recusa: `mensagem` geral (credencial, token XSRF) ou, na validação do servidor,
+ * `campos` com a mensagem de cada campo e `mensagem` nula.
+ */
+export type ResultadoEntrar =
+  | { ok: true }
+  | { ok: false; mensagem: string; campos?: undefined }
+  | { ok: false; mensagem: null; campos: Partial<Record<CampoLogin, string>> };
 
 /**
  * Sessão do usuário. Quem decide é o servidor (cookie HttpOnly, ADR-006): aqui só se guarda
@@ -45,11 +54,15 @@ export class AuthService {
     try {
       await firstValueFrom(this.http.post<void>('/api/auth/login', { usuario, senha }));
     } catch (erro) {
-      if (erro instanceof HttpErrorResponse && erro.status === 401)
-        return { ok: false, mensagem: MENSAGEM_CREDENCIAL_INVALIDA };
-      // 400: token XSRF ausente/vencido (aba antiga) ou campos vazios; a API explica.
-      if (erro instanceof HttpErrorResponse && erro.status === 400)
-        return { ok: false, mensagem: (erro.error as ErroApi | null)?.mensagem ?? 'Não foi possível entrar. Recarregue a página.' };
+      if (!(erro instanceof HttpErrorResponse)) throw erro;
+      if (erro.status === 401)
+        return { ok: false, mensagem: mensagemDe(erro) ?? MENSAGEM_CREDENCIAL_INVALIDA };
+      if (erro.status === 400) {
+        // Validação (ValidationProblem): mensagem por campo. Senão, token XSRF ausente/vencido (aba antiga).
+        const campos = camposDe(erro);
+        if (campos) return { ok: false, mensagem: null, campos };
+        return { ok: false, mensagem: mensagemDe(erro) ?? 'Não foi possível entrar. Recarregue a página.' };
+      }
       throw erro;
     }
 
@@ -57,9 +70,15 @@ export class AuthService {
     return { ok: true };
   }
 
+  /**
+   * Encerra a sessão no servidor e, aconteça o que acontecer, aqui. Se a sessão já tinha acabado
+   * (12 h, logout em outra aba: 400/401) ou a rede caiu, não há o que fazer além de esquecer o usuário.
+   */
   async sair(): Promise<void> {
     try {
       await firstValueFrom(this.http.post<void>('/api/auth/logout', null));
+    } catch {
+      // Ignorado: o usuário quer sair, e a sessão local é encerrada de qualquer forma.
     } finally {
       this.encerrarLocalmente();
     }
@@ -70,4 +89,22 @@ export class AuthService {
     this._sessao.set(null);
     this.consultada = true;
   }
+}
+
+function mensagemDe(erro: HttpErrorResponse): string | null {
+  const mensagem = (erro.error as Partial<ErroApi> | null)?.mensagem;
+  return typeof mensagem === 'string' && mensagem ? mensagem : null;
+}
+
+/** `errors` de um ValidationProblem do ASP.NET Core (`{ "Usuario": ["..."] }`), por campo do formulário. */
+function camposDe(erro: HttpErrorResponse): Partial<Record<CampoLogin, string>> | null {
+  const errors = (erro.error as { errors?: Record<string, string[]> } | null)?.errors;
+  if (!errors || typeof errors !== 'object') return null;
+
+  const campos: Partial<Record<CampoLogin, string>> = {};
+  for (const [chave, mensagens] of Object.entries(errors)) {
+    const campo = chave.toLowerCase();
+    if ((campo === 'usuario' || campo === 'senha') && mensagens?.length) campos[campo] = mensagens[0];
+  }
+  return Object.keys(campos).length ? campos : null;
 }

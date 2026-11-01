@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { Shell } from './shell';
 
@@ -47,5 +47,18 @@ describe('Shell', () => {
     const elemento = await renderizarCom(PERMISSOES_OPERADOR);
 
     expect(elemento.querySelector('[data-usuario]')?.textContent).toContain('Ana');
+  });
+
+  it('sair com a sessão já vencida (CA-4) volta ao login', async () => {
+    const elemento = await renderizarCom(PERMISSOES_OPERADOR);
+    const navegar = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+    Array.from(elemento.querySelectorAll('button')).find((b) => b.textContent?.includes('Sair'))!.click();
+    TestBed.inject(HttpTestingController)
+      .expectOne('/api/auth/logout')
+      .flush({ mensagem: 'Recarregue a página.' }, { status: 400, statusText: 'Bad Request' });
+    await vi.waitFor(() => expect(navegar).toHaveBeenCalledWith('/login'));
+
+    expect(TestBed.inject(AuthService).sessao()).toBeNull();
   });
 });
