@@ -11,6 +11,7 @@ import { filter, map } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { itensVisiveis } from '../../core/menu/menu';
 import { PreferenciaTema, TemaService } from '../../core/tema/tema.service';
+import { VersaoService } from '../../core/versao/versao.service';
 
 /**
  * Shell da retaguarda: menu lateral (gaveta no celular), barra superior de 56 px com título, usuário,
@@ -31,6 +32,7 @@ export class Shell {
   private readonly router = inject(Router);
   private readonly rota = inject(ActivatedRoute);
   protected readonly tema = inject(TemaService);
+  protected readonly versao = inject(VersaoService);
 
   protected readonly sessao = this.auth.sessao;
   protected readonly itens = computed(() => itensVisiveis(this.auth.permissoes()));
@@ -53,6 +55,10 @@ export class Shell {
     { valor: 'escuro', rotulo: 'Escuro', icone: 'dark_mode' },
     { valor: 'sistema', rotulo: 'Do sistema', icone: 'contrast' },
   ];
+
+  constructor() {
+    void this.versao.carregarApi();
+  }
 
   protected async sair(): Promise<void> {
     try {

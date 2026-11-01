@@ -60,5 +60,15 @@
     <main class="conteudo">
       <router-outlet />
     </main>
+
+    <footer class="rodape" data-versao>
+      <span>Web {{ versao.web.versao }} ({{ versao.web.commit }})</span>
+      <span aria-hidden="true">·</span>
+      @if (versao.api(); as api) {
+        <span>API {{ api.versao }} ({{ api.commit }})</span>
+      } @else {
+        <span>API —</span>
+      }
+    </footer>
   </mat-sidenav-content>
 </mat-sidenav-container>
