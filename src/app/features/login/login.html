@@ -1,0 +1,55 @@
+<main class="login">
+  <app-cena-espacial class="painel" />
+
+  <section class="formulario">
+    <img
+      class="logo"
+      [src]="tema.escuro() ? 'brand/logo-horizontal-negativo.png' : 'brand/logo-horizontal.png'"
+      alt="Impacto Papelaria &amp; Serviços"
+    />
+
+    <h1>Entrar</h1>
+
+    <form [formGroup]="formulario" (ngSubmit)="entrar()" novalidate>
+      <mat-form-field appearance="outline">
+        <mat-label>Usuário</mat-label>
+        <input
+          matInput
+          formControlName="usuario"
+          autocomplete="username"
+          autocapitalize="none"
+          spellcheck="false"
+          [errorStateMatcher]="erroQuandoTocado"
+        />
+        @if (formulario.controls.usuario.hasError('required')) {
+          <mat-error>Informe o usuário</mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Senha</mat-label>
+        <input
+          matInput
+          type="password"
+          formControlName="senha"
+          autocomplete="current-password"
+          [errorStateMatcher]="erroQuandoTocado"
+        />
+        @if (formulario.controls.senha.hasError('required')) {
+          <mat-error>Informe a senha</mat-error>
+        }
+      </mat-form-field>
+
+      @if (erro(); as mensagem) {
+        <p class="erro" role="alert">
+          <mat-icon aria-hidden="true">cancel</mat-icon>
+          <span>{{ mensagem }}</span>
+        </p>
+      }
+
+      <button mat-flat-button type="submit" [disabled]="enviando()">
+        {{ enviando() ? 'Processando…' : 'Entrar' }}
+      </button>
+    </form>
+  </section>
+</main>

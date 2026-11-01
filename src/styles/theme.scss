@@ -1,0 +1,75 @@
+// Tema do IMPA: Angular Material 3 com as cores da direção de arte (docs/impa/direcao-arte/fundacao.md).
+// Paletas neutras do Material; só os tokens da marca são substituídos (decisão em aberto da story 1-1:
+// avaliar o schematic de paletas depois). Cada token usa light-dark(claro, escuro) e segue o color-scheme.
+@use '@angular/material' as mat;
+
+$espaco: #121318;
+$espaco-2: #1c1d24;
+$impacto: #e81d23;
+$brasa: #b92315;
+$nevoa: #d4d6e2;
+
+html {
+  // Padrão: preferência do sistema. O TemaService troca por data-tema="claro|escuro".
+  color-scheme: light dark;
+
+  @include mat.theme(
+    (
+      color: (
+        primary: mat.$red-palette,
+        tertiary: mat.$orange-palette,
+      ),
+      typography: (
+        plain-family: Montserrat,
+        brand-family: Montserrat,
+      ),
+      density: 0,
+    ),
+    $overrides: (
+      // Ação principal: preta no claro, vermelha no escuro (D-08); texto branco nos dois.
+      primary: light-dark($espaco, $impacto),
+      on-primary: #ffffff,
+      // Superfícies, texto e bordas (tabela "Temas claro e escuro").
+      background: light-dark(#f7f6f4, $espaco),
+      on-background: light-dark(#18181c, #f0eff2),
+      surface: light-dark(#ffffff, $espaco-2),
+      surface-container-lowest: light-dark(#ffffff, $espaco-2),
+      surface-container-low: light-dark(#ffffff, $espaco-2),
+      surface-container: light-dark(#ffffff, $espaco-2),
+      surface-container-high: light-dark(#f0efec, #26272f),
+      surface-container-highest: light-dark(#f0efec, #26272f),
+      on-surface: light-dark(#18181c, #f0eff2),
+      on-surface-variant: light-dark(#6b6a73, #9c9ba6),
+      outline: light-dark(#d6d4d0, #3a3b45),
+      outline-variant: light-dark(#e6e5e1, #2c2d36),
+      // Erro em Brasa (nunca o vermelho da marca).
+      error: light-dark($brasa, #ff8a80),
+      on-error: light-dark(#ffffff, $espaco),
+    )
+  );
+}
+
+html[data-tema='claro'] {
+  color-scheme: light;
+}
+
+html[data-tema='escuro'] {
+  color-scheme: dark;
+}
+
+// Tokens da marca para os componentes do IMPA (fora do Material).
+:root {
+  --impa-fundo: light-dark(#f7f6f4, #{$espaco});
+  --impa-superficie: light-dark(#ffffff, #{$espaco-2});
+  --impa-superficie-ativa: light-dark(#f0efec, #26272f);
+  --impa-texto: light-dark(#18181c, #f0eff2);
+  --impa-texto-secundario: light-dark(#6b6a73, #9c9ba6);
+  --impa-borda: light-dark(#e6e5e1, #2c2d36);
+  --impa-acao: light-dark(#{$espaco}, #{$impacto});
+  --impa-foco: light-dark(#{$espaco}, #{$nevoa});
+  --impa-impacto: #{$impacto};
+  --impa-brasa: #{$brasa};
+  --impa-espaco: #{$espaco};
+  --impa-display: 'Bebas Neue', 'Oswald', 'Arial Narrow', Impact, sans-serif;
+  --impa-corpo: Montserrat, 'Segoe UI', Arial, sans-serif;
+}

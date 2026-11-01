@@ -1,0 +1,122 @@
+:host {
+  display: block;
+  height: 100dvh;
+}
+
+.container {
+  height: 100%;
+  background: var(--impa-fundo);
+}
+
+// Menu lateral de 224 px; item ativo com traço vertical Impacto de 3 px.
+.menu {
+  width: 224px;
+  padding: 18px 12px;
+  background: var(--impa-superficie);
+  border-right: 1px solid var(--impa-borda);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.logo {
+  display: block;
+  width: 140px;
+  height: auto;
+  margin: 2px 8px 20px;
+}
+
+nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  a {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: 8px;
+    color: var(--impa-texto-secundario);
+    font-weight: 500;
+    text-decoration: none;
+
+    &:hover {
+      background: var(--impa-superficie-ativa);
+    }
+
+    &.ativo {
+      background: var(--impa-superficie-ativa);
+      color: var(--impa-texto);
+      font-weight: 600;
+
+      &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        width: 3px;
+        height: 18px;
+        border-radius: 2px;
+        background: var(--impa-impacto);
+      }
+    }
+
+    mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+  }
+}
+
+.principal {
+  display: flex;
+  flex-direction: column;
+}
+
+.barra {
+  height: 56px;
+  gap: 8px;
+  padding: 0 16px 0 20px;
+  background: var(--impa-superficie);
+  border-bottom: 1px solid var(--impa-borda);
+  color: var(--impa-texto);
+}
+
+.titulo {
+  margin: 0;
+  font-family: var(--impa-corpo);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.5;
+}
+
+.espaco {
+  flex: 1;
+}
+
+.usuario {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--impa-texto-secundario);
+}
+
+.conteudo {
+  padding: 24px;
+}
+
+@media (max-width: 840px) {
+  .barra {
+    padding: 0 8px;
+  }
+
+  .usuario {
+    display: none;
+  }
+
+  .conteudo {
+    padding: 16px;
+  }
+}
