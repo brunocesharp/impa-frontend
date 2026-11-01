@@ -38,6 +38,13 @@ Os ícones do PWA (`any` e `maskable`), o `apple-touch-icon` e o `favicon.ico` s
 python scripts/gerar-icones.py public    # requer Pillow
 ```
 
+## Versão
+
+O rodapé do shell mostra **Web {versão} ({commit})** e **API {versão} ({commit})** (`GET /api/versao`).
+A versão do front é a `version` do `package.json`; o commit fica `dev` no repositório
+(`src/app/core/versao/commit.ts`) e é gravado no build de homologação por `node scripts/gravar-versao.mjs {commit}`
+(chamado pelo `Dockerfile.web` do impa-backend, com o commit vindo de `deploy/subir.sh`).
+
 ## Rodar localmente
 
 API no perfil https (`dotnet run --project src/Host/Impa.Host --launch-profile https` no impa-backend) e:

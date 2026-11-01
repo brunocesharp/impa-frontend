@@ -4,6 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { Router, provideRouter } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { Shell } from './shell';
+import { VERSAO_WEB } from '../../core/versao/versao';
 
 const PERMISSOES_OPERADOR = ['pdv.vender', 'caixa.operar', 'caixa.fechar', 'catalogo.ver', 'clientes.ver', 'clientes.editar'];
 
@@ -21,6 +22,11 @@ describe('Shell', () => {
     await carregando;
 
     const fixture = TestBed.createComponent(Shell);
+    await fixture.whenStable();
+    // O rodapé consulta a versão da API ao abrir o shell.
+    TestBed.inject(HttpTestingController)
+      .match('/api/versao')
+      .forEach((r) => r.flush({ versao: '0.1.0', commit: '1f55d46' }));
     await fixture.whenStable();
     return fixture.nativeElement as HTMLElement;
   }
@@ -60,5 +66,13 @@ describe('Shell', () => {
     await vi.waitFor(() => expect(navegar).toHaveBeenCalledWith('/login'));
 
     expect(TestBed.inject(AuthService).sessao()).toBeNull();
+  });
+
+  it('rodapé mostra a versão do front e a da API', async () => {
+    const elemento = await renderizarCom(PERMISSOES_OPERADOR);
+    const rodape = () => elemento.querySelector('footer[data-versao]')?.textContent ?? '';
+
+    await vi.waitFor(() => expect(rodape()).toContain('API 0.1.0 (1f55d46)'));
+    expect(rodape()).toContain(`Web ${VERSAO_WEB.versao} (${VERSAO_WEB.commit})`);
   });
 });
