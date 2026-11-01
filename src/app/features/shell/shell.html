@@ -1,0 +1,64 @@
+<mat-sidenav-container class="container">
+  <mat-sidenav
+    #gaveta
+    class="menu"
+    [mode]="celular() ? 'over' : 'side'"
+    [opened]="!celular()"
+    [fixedInViewport]="celular()"
+  >
+    <img
+      class="logo"
+      [src]="tema.escuro() ? 'brand/logo-horizontal-negativo.png' : 'brand/logo-horizontal.png'"
+      alt="Impacto Papelaria &amp; Serviços"
+    />
+    <nav aria-label="Menu principal">
+      @for (item of itens(); track item.rota) {
+        <a
+          data-item-menu
+          [routerLink]="['/', item.rota]"
+          routerLinkActive="ativo"
+          [routerLinkActiveOptions]="{ exact: item.rota === '' }"
+          ariaCurrentWhenActive="page"
+          (click)="celular() && gaveta.close()"
+        >
+          <mat-icon aria-hidden="true">{{ item.icone }}</mat-icon>
+          <span>{{ item.rotulo }}</span>
+        </a>
+      }
+    </nav>
+  </mat-sidenav>
+
+  <mat-sidenav-content class="principal">
+    <mat-toolbar class="barra">
+      @if (celular()) {
+        <button mat-icon-button type="button" aria-label="Abrir o menu" (click)="gaveta.toggle()">
+          <mat-icon>menu</mat-icon>
+        </button>
+      }
+      <h1 class="titulo">{{ titulo() }}</h1>
+      <span class="espaco"></span>
+
+      <button mat-icon-button type="button" [matMenuTriggerFor]="menuTema" aria-label="Tema" title="Tema">
+        <mat-icon>{{ tema.escuro() ? 'dark_mode' : 'light_mode' }}</mat-icon>
+      </button>
+      <mat-menu #menuTema="matMenu">
+        @for (opcao of opcoesTema; track opcao.valor) {
+          <button mat-menu-item type="button" (click)="tema.escolher(opcao.valor)">
+            <mat-icon>{{ tema.preferencia() === opcao.valor ? 'check' : opcao.icone }}</mat-icon>
+            <span>{{ opcao.rotulo }}</span>
+          </button>
+        }
+      </mat-menu>
+
+      <span class="usuario" data-usuario>{{ sessao()?.nome }}</span>
+      <button mat-button type="button" (click)="sair()">
+        <mat-icon>logout</mat-icon>
+        Sair
+      </button>
+    </mat-toolbar>
+
+    <main class="conteudo">
+      <router-outlet />
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

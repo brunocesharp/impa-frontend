@@ -1,0 +1,48 @@
+@use './styles/theme';
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--impa-fundo);
+  color: var(--impa-texto);
+  font: var(--mat-sys-body-medium);
+  font-family: var(--impa-corpo);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+h1,
+h2,
+.impa-display {
+  font-family: var(--impa-display);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 0.95;
+}
+
+// Foco sempre visível no teclado: anel de 2 px afastado 2 px.
+:focus-visible {
+  outline: 2px solid var(--impa-foco);
+  outline-offset: 2px;
+}
+
+// Cartões planos: borda de 1 px, cantos de 12 px, sem sombra.
+.mat-mdc-card {
+  --mat-card-elevated-container-elevation: none;
+  border: 1px solid var(--impa-borda);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

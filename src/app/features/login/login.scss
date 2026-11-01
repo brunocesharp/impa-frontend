@@ -1,0 +1,78 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+}
+
+.login {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 100dvh;
+}
+
+.painel {
+  min-height: 100%;
+}
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px clamp(24px, 8vw, 96px);
+  background: var(--impa-superficie);
+}
+
+.logo {
+  width: min(240px, 70%);
+  height: auto;
+  margin-bottom: 24px;
+}
+
+h1 {
+  font-size: 40px;
+  margin: 0 0 16px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 360px;
+}
+
+.erro {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  color: var(--mat-sys-error);
+  font-weight: 600;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+button[type='submit'] {
+  height: 44px;
+  margin-top: 8px;
+}
+
+// Celular: o espaço vira uma faixa no topo; o formulário ocupa o resto.
+@media (max-width: 720px) {
+  .login {
+    grid-template-columns: 1fr;
+    grid-template-rows: 180px 1fr;
+  }
+
+  .formulario {
+    justify-content: flex-start;
+    padding: 24px 16px;
+  }
+
+  form {
+    max-width: none;
+  }
+}
