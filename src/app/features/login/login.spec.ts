@@ -86,7 +86,10 @@ describe('Login', () => {
     const meInicial = http.expectOne('/api/auth/me');
 
     preencherEEntrar(elemento, 'ana', 'balcao2026');
-    await Promise.resolve();
+    // Esgota as microtarefas e a fila de tarefas: um envio que não espera o /me já teria saído.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     http.expectNone('/api/auth/login');
 
     meInicial.flush(null, { status: 401, statusText: 'Unauthorized' });

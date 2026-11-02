@@ -71,17 +71,18 @@ export class AuthService {
   }
 
   /**
-   * Encerra a sessão no servidor e, aconteça o que acontecer, aqui. Se a sessão já tinha acabado
-   * (12 h, logout em outra aba: 400/401) ou a rede caiu, não há o que fazer além de esquecer o usuário.
+   * Encerra a sessão no servidor e, depois, aqui. Se a sessão já tinha acabado (12 h, logout em outra aba:
+   * 400/401), só resta esquecer o usuário. Qualquer outro erro (sem rede, 5xx) é propagado e o usuário
+   * continua na sessão: o cookie pode seguir válido, e o próximo a abrir o login entraria como ele.
    */
   async sair(): Promise<void> {
     try {
       await firstValueFrom(this.http.post<void>('/api/auth/logout', null));
-    } catch {
-      // Ignorado: o usuário quer sair, e a sessão local é encerrada de qualquer forma.
-    } finally {
-      this.encerrarLocalmente();
+    } catch (erro) {
+      const sessaoJaEncerrada = erro instanceof HttpErrorResponse && (erro.status === 400 || erro.status === 401);
+      if (!sessaoJaEncerrada) throw erro;
     }
+    this.encerrarLocalmente();
   }
 
   /** A sessão acabou no servidor (401 em qualquer chamada): esquece o usuário. */

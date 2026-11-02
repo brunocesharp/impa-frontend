@@ -29,6 +29,15 @@ As skills `angular-core-layer`/`angular-feature-layer` organizam o `core/` por *
 deixa o padrão de ponta a ponta mais fácil de seguir. Registrado na story 1-1 (revisão 1, R11); rever quando
 o `core/` crescer ou quando entrar estado global.
 
+### Convenção de nomes (desvio das skills `angular-*`)
+
+Segue o padrão do Angular CLI 22: **componentes sem sufixo** (`login.ts` com a classe `Login`, `shell.ts`/`Shell`,
+`indisponivel.ts`/`Indisponivel`), e **services, guards e interceptors com sufixo** no arquivo e, nos services, na
+classe (`auth.service.ts`/`AuthService`, `tema.service.ts`/`TemaService`, `auth.guard.ts`/`autenticadoGuard`,
+`sessao-expirada.interceptor.ts`/`sessaoExpiradaInterceptor`). Modelos e constantes ficam em arquivos sem sufixo
+(`sessao.ts`, `menu.ts`). As skills `angular-*` usam `*.component.ts`/`LoginComponent`; vale esta convenção para as
+próximas stories. Registrado na story 1-1 (revisão 2, R18).
+
 ## Ícones
 
 Os ícones do PWA (`any` e `maskable`), o `apple-touch-icon` e o `favicon.ico` são gerados a partir de
@@ -56,6 +65,11 @@ npm start          # http://localhost:4200, /api encaminhado para https://localh
 
 A sessão é por cookie HttpOnly. A proteção CSRF usa o cookie `XSRF-TOKEN`, que o Angular devolve no cabeçalho
 `X-XSRF-TOKEN` (`withXsrfConfiguration`). A tela de login consulta `/api/auth/me` ao abrir para receber o token.
+
+> **Só em `localhost`.** Os cookies de sessão e `XSRF-TOKEN` são `Secure`. O `ng serve` em `http://localhost:4200`
+> só funciona porque os navegadores tratam `localhost` como contexto seguro. Abrindo pelo IP da rede
+> (`http://192.168.x.x:4200`, para testar no celular), o navegador descarta os cookies e todo login responde 400.
+> Para testar em outro aparelho, use o compose local por HTTPS (`impa-backend/deploy/README.md`).
 
 ## Testes
 

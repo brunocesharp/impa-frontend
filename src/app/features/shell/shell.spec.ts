@@ -68,6 +68,23 @@ describe('Shell', () => {
     expect(TestBed.inject(AuthService).sessao()).toBeNull();
   });
 
+  for (const [status, statusText] of [
+    [0, 'Unknown Error'],
+    [503, 'Service Unavailable'],
+  ] as const) {
+    it(`sair com a API fora (${status}) mantém o usuário e avisa, sem ir ao login`, async () => {
+      const elemento = await renderizarCom(PERMISSOES_OPERADOR);
+      const navegar = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+
+      Array.from(elemento.querySelectorAll('button')).find((b) => b.textContent?.includes('Sair'))!.click();
+      TestBed.inject(HttpTestingController).expectOne('/api/auth/logout').flush(null, { status, statusText });
+
+      await vi.waitFor(() => expect(document.body.textContent).toContain('Não foi possível sair. Tente de novo.'));
+      expect(navegar).not.toHaveBeenCalled();
+      expect(TestBed.inject(AuthService).sessao()?.usuario).toBe('ana');
+    });
+  }
+
   it('rodapé mostra a versão do front e a da API', async () => {
     const elemento = await renderizarCom(PERMISSOES_OPERADOR);
     const rodape = () => elemento.querySelector('footer[data-versao]')?.textContent ?? '';
