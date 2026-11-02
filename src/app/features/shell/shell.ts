@@ -5,6 +5,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
@@ -31,6 +32,7 @@ export class Shell {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly rota = inject(ActivatedRoute);
+  private readonly avisos = inject(MatSnackBar);
   protected readonly tema = inject(TemaService);
   protected readonly versao = inject(VersaoService);
 
@@ -62,11 +64,14 @@ export class Shell {
 
   protected async sair(): Promise<void> {
     try {
+      // Sessão encerrada no servidor (ou que já tinha acabado: 400/401).
       await this.auth.sair();
-    } finally {
-      // Sempre volta ao login, mesmo que o servidor recuse (sessão já encerrada).
-      await this.router.navigateByUrl('/login');
+    } catch {
+      // Sem rede ou API fora: o cookie pode continuar válido, então não vai ao login (caixa compartilhado).
+      this.avisos.open('Não foi possível sair. Tente de novo.', 'OK', { duration: 6000 });
+      return;
     }
+    await this.router.navigateByUrl('/login');
   }
 
   private tituloDaRotaAtual(): string {

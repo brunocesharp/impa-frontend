@@ -26,7 +26,6 @@ describe('AuthService', () => {
     for (const [status, statusText] of [
       [400, 'Bad Request'], // token XSRF de uma sessão que já acabou
       [401, 'Unauthorized'], // logout feito em outra aba
-      [0, 'Unknown Error'], // sem rede
     ] as const) {
       it(`não propaga o erro ${status} e esquece o usuário`, async () => {
         await comSessao();
@@ -38,6 +37,32 @@ describe('AuthService', () => {
         expect(auth.sessao()).toBeNull();
       });
     }
+
+    for (const [status, statusText] of [
+      [0, 'Unknown Error'], // sem rede
+      [500, 'Internal Server Error'],
+      [502, 'Bad Gateway'], // API fora, Caddy no ar
+    ] as const) {
+      it(`com erro ${status} propaga o erro e mantém o usuário (o cookie pode continuar válido)`, async () => {
+        await comSessao();
+
+        const saindo = auth.sair();
+        http.expectOne('/api/auth/logout').flush(null, { status, statusText });
+
+        await expect(saindo).rejects.toMatchObject({ status });
+        expect(auth.sessao()?.usuario).toBe('ana');
+      });
+    }
+
+    it('logout aceito esquece o usuário', async () => {
+      await comSessao();
+
+      const saindo = auth.sair();
+      http.expectOne('/api/auth/logout').flush(null, { status: 204, statusText: 'No Content' });
+
+      await expect(saindo).resolves.toBeUndefined();
+      expect(auth.sessao()).toBeNull();
+    });
   });
 
   describe('entrar', () => {

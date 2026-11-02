@@ -45,11 +45,18 @@ describe('Indisponivel', () => {
     const { navegar, botao, fixture } = await abrir('/caixa');
 
     botao.click();
-    http.expectOne('/api/auth/me').flush(null, { status: 502, statusText: 'Bad Gateway' });
-    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(botao.disabled).toBe(true); // tentando
 
+    http.expectOne('/api/auth/me').flush(null, { status: 502, statusText: 'Bad Gateway' });
+
+    // O erro foi tratado: o botão volta a ficar disponível para outra tentativa.
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(botao.disabled).toBe(false);
+    });
+    expect(botao.textContent).toContain('Tentar de novo');
     expect(navegar).not.toHaveBeenCalled();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Não foi possível falar com o servidor');
   });
 
   it('ignora destino externo', async () => {
