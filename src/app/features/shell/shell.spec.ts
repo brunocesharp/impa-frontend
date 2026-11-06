@@ -55,18 +55,22 @@ describe('Shell', () => {
     expect(elemento.querySelector('[data-usuario]')?.textContent).toContain('Ana');
   });
 
-  it('sair com a sessão já vencida (CA-4) volta ao login', async () => {
-    const elemento = await renderizarCom(PERMISSOES_OPERADOR);
-    const navegar = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+  for (const [caso, status, statusText, corpo] of [
+    ['logout aceito (204)', 204, 'No Content', null],
+    ['sessão já vencida (400, CA-4)', 400, 'Bad Request', { mensagem: 'Recarregue a página.' }],
+    ['sessão encerrada em outra aba (401)', 401, 'Unauthorized', { mensagem: 'Não autenticado.' }],
+  ] as const) {
+    it(`sair com ${caso} volta ao login e esquece o usuário`, async () => {
+      const elemento = await renderizarCom(PERMISSOES_OPERADOR);
+      const navegar = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
 
-    Array.from(elemento.querySelectorAll('button')).find((b) => b.textContent?.includes('Sair'))!.click();
-    TestBed.inject(HttpTestingController)
-      .expectOne('/api/auth/logout')
-      .flush({ mensagem: 'Recarregue a página.' }, { status: 400, statusText: 'Bad Request' });
-    await vi.waitFor(() => expect(navegar).toHaveBeenCalledWith('/login'));
+      Array.from(elemento.querySelectorAll('button')).find((b) => b.textContent?.includes('Sair'))!.click();
+      TestBed.inject(HttpTestingController).expectOne('/api/auth/logout').flush(corpo, { status, statusText });
+      await vi.waitFor(() => expect(navegar).toHaveBeenCalledWith('/login'));
 
-    expect(TestBed.inject(AuthService).sessao()).toBeNull();
-  });
+      expect(TestBed.inject(AuthService).sessao()).toBeNull();
+    });
+  }
 
   for (const [status, statusText] of [
     [0, 'Unknown Error'],

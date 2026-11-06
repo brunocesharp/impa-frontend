@@ -14,6 +14,7 @@ src/
     ├── core/auth/             # AuthService (sessão de /api/auth/me), guards, interceptor de 401
     ├── core/menu/             # itens do menu e a permissão de cada um
     ├── core/tema/             # TemaService: claro / escuro / do sistema
+    ├── core/versao/           # versão do front (package.json + commit) e VersaoService (GET /api/versao)
     └── features/              # login (com a cena espacial), shell, início, em construção, indisponível
 public/brand/                  # logotipos e símbolo (de docs/impa/direcao-arte/assets)
 public/icons/, favicon.ico     # ícones do PWA a partir do símbolo (scripts/gerar-icones.py)
@@ -24,7 +25,8 @@ e2e/                           # testes ponta a ponta (Playwright)
 
 As skills `angular-core-layer`/`angular-feature-layer` organizam o `core/` por **tipo de artefato**
 (`services/`, `interceptors/`, `guards/`, `models/`...). Aqui o `core/` é organizado por **assunto**
-(`core/auth/` com service, guards, interceptor e modelo juntos; `core/menu/`; `core/tema/`), e cada tela fica em
+(`core/auth/` com service, guards, interceptor e modelo juntos; `core/menu/`; `core/tema/`; `core/versao/` com o
+modelo, o commit gravado no build e o `VersaoService`), e cada tela fica em
 `features/{tela}/`, sem NgRx nem SignalR. Motivo: na story 1-1 cada assunto tem poucos arquivos, e juntá-los
 deixa o padrão de ponta a ponta mais fácil de seguir. Registrado na story 1-1 (revisão 1, R11); rever quando
 o `core/` crescer ou quando entrar estado global.
