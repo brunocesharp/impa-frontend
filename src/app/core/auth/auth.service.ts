@@ -1,7 +1,14 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { CODIGO_BLOQUEADO, ErroApi, MENSAGEM_BLOQUEADO, MENSAGEM_CREDENCIAL_INVALIDA, Sessao } from './sessao';
+import {
+  CODIGO_BLOQUEADO,
+  ErroApi,
+  MENSAGEM_BLOQUEADO,
+  MENSAGEM_CREDENCIAL_INVALIDA,
+  MENSAGEM_MUITAS_TENTATIVAS,
+  Sessao,
+} from './sessao';
 
 export type CampoLogin = 'usuario' | 'senha';
 
@@ -63,6 +70,8 @@ export class AuthService {
         const padrao = codigoDe(erro) === CODIGO_BLOQUEADO ? MENSAGEM_BLOQUEADO : MENSAGEM_CREDENCIAL_INVALIDA;
         return { ok: false, mensagem: mensagemDe(erro) ?? padrao };
       }
+      // Limite de tentativas por IP (story 1-10): recusa como o 401, não "sem conexão".
+      if (erro.status === 429) return { ok: false, mensagem: mensagemDe(erro) ?? MENSAGEM_MUITAS_TENTATIVAS };
       if (erro.status === 400) {
         // Validação (ValidationProblem): mensagem por campo. Senão, token XSRF ausente/vencido (aba antiga).
         const campos = camposDe(erro);
