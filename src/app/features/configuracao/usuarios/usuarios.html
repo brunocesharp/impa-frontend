@@ -1,0 +1,183 @@
+<div class="topo">
+  <a mat-button routerLink="/configuracao">
+    <mat-icon>arrow_back</mat-icon>
+    Configuração
+  </a>
+</div>
+
+@if (carregando()) {
+  <p class="estado">Carregando usuários…</p>
+} @else {
+  <div class="layout">
+    <mat-card appearance="outlined" class="lista">
+      <div class="lista-cabecalho">
+        <h2>Usuários</h2>
+        <button mat-flat-button type="button" (click)="criarNovo()">
+          <mat-icon>person_add</mat-icon>
+          Novo usuário
+        </button>
+      </div>
+
+      <ul role="list">
+        @for (usuario of usuarios(); track usuario.id) {
+          <li>
+            <button
+              type="button"
+              class="item"
+              data-usuario
+              [class.ativo]="usuario.id === selecionado()"
+              [class.inativo]="!usuario.ativo"
+              [attr.aria-current]="usuario.id === selecionado() ? 'true' : null"
+              (click)="selecionar(usuario)"
+            >
+              <span class="item-nome">{{ usuario.nome }}</span>
+              <span class="item-info">
+                <span>{{ usuario.usuario }} · {{ usuario.perfil || 'Sem perfil' }}</span>
+                <span class="selos">
+                  @if (!usuario.ativo) {
+                    <span class="selo" data-selo="inativo"
+                      ><mat-icon aria-hidden="true">block</mat-icon>Inativo</span
+                    >
+                  }
+                  @if (usuario.trocaDeSenhaObrigatoria) {
+                    <span class="selo" data-selo="provisoria"
+                      ><mat-icon aria-hidden="true">key</mat-icon>Senha provisória</span
+                    >
+                  }
+                </span>
+              </span>
+            </button>
+          </li>
+        }
+      </ul>
+    </mat-card>
+
+    @if (selecionado()) {
+      <mat-card appearance="outlined" class="editor">
+        <h2>{{ novo() ? 'Novo usuário' : atual()?.nome }}</h2>
+
+        @if (!novo() && atual(); as usuario) {
+          <p class="situacao" data-situacao>
+            {{ usuario.ativo ? 'Ativo' : 'Inativo — não consegue entrar' }}
+            @if (usuario.trocaDeSenhaObrigatoria) {
+              · precisa trocar a senha provisória no próximo acesso
+            }
+          </p>
+        }
+
+        <form [formGroup]="formulario" (ngSubmit)="salvar()" novalidate class="campos">
+          <mat-form-field appearance="outline">
+            <mat-label>Usuário (login)</mat-label>
+            <input
+              matInput
+              data-campo="usuario"
+              formControlName="usuario"
+              maxlength="50"
+              autocomplete="off"
+            />
+            @if (formulario.controls.usuario.hasError('required')) {
+              <mat-error>Informe o usuário</mat-error>
+            } @else if (formulario.controls.usuario.hasError('pattern')) {
+              <mat-error>Use letras sem acento, números e . _ - @ +</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Nome</mat-label>
+            <input
+              matInput
+              data-campo="nome"
+              formControlName="nome"
+              maxlength="120"
+              autocomplete="off"
+            />
+            @if (formulario.controls.nome.hasError('required')) {
+              <mat-error>Informe o nome</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>E-mail (opcional)</mat-label>
+            <input
+              matInput
+              type="email"
+              data-campo="email"
+              formControlName="email"
+              autocomplete="off"
+            />
+            <mat-hint>Usado na recuperação de senha</mat-hint>
+            @if (formulario.controls.email.hasError('email')) {
+              <mat-error>E-mail inválido</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Perfil</mat-label>
+            <mat-select data-campo="perfil" formControlName="perfilId">
+              @for (perfil of perfis(); track perfil.id) {
+                <mat-option [value]="perfil.id">{{ perfil.nome }}</mat-option>
+              }
+            </mat-select>
+            @if (formulario.controls.perfilId.hasError('required')) {
+              <mat-error>Escolha o perfil</mat-error>
+            }
+          </mat-form-field>
+
+          @if (novo()) {
+            <mat-form-field appearance="outline">
+              <mat-label>Senha inicial (opcional)</mat-label>
+              <input matInput data-campo="senha" formControlName="senha" autocomplete="off" />
+              <mat-hint>Em branco, o sistema gera. O usuário troca no primeiro acesso.</mat-hint>
+              @if (formulario.controls.senha.hasError('minlength')) {
+                <mat-error>A senha precisa ter pelo menos {{ senhaMinima }} caracteres</mat-error>
+              }
+            </mat-form-field>
+          }
+
+          @if (erro()) {
+            <p class="erro" role="alert">{{ erro() }}</p>
+          }
+          @if (aviso()) {
+            <p class="aviso" role="status">{{ aviso() }}</p>
+          }
+
+          <div class="acoes">
+            @if (!novo() && atual(); as usuario) {
+              <button
+                mat-button
+                type="button"
+                data-acao="redefinir"
+                [disabled]="salvando()"
+                (click)="redefinirSenha()"
+              >
+                <mat-icon>key</mat-icon>
+                {{ confirmando() === 'redefinir' ? 'Confirmar redefinição' : 'Redefinir senha' }}
+              </button>
+              <button
+                mat-button
+                type="button"
+                data-acao="situacao"
+                [class.perigo]="usuario.ativo"
+                [disabled]="salvando()"
+                (click)="alternarSituacao()"
+              >
+                <mat-icon>{{ usuario.ativo ? 'person_off' : 'person_check' }}</mat-icon>
+                {{
+                  usuario.ativo
+                    ? confirmando() === 'desativar'
+                      ? 'Confirmar desativação'
+                      : 'Desativar'
+                    : 'Reativar'
+                }}
+              </button>
+            }
+            <span class="espaco"></span>
+            <button mat-flat-button type="submit" [disabled]="salvando()">
+              {{ novo() ? 'Criar usuário' : 'Salvar' }}
+            </button>
+          </div>
+        </form>
+      </mat-card>
+    }
+  </div>
+}

@@ -4,7 +4,15 @@ export interface Sessao {
   nome: string;
   perfil: string;
   permissoes: string[];
+  /** Senha provisória (story 1-4, RN-1.8): até trocar, a API só aceita a troca de senha. Ausente = `false`. */
+  trocaDeSenhaObrigatoria?: boolean;
 }
+
+/** `codigo` do 403 de qualquer função enquanto a troca de senha estiver pendente (story 1-4). */
+export const CODIGO_TROCA_DE_SENHA_OBRIGATORIA = 'troca_de_senha_obrigatoria';
+
+/** RN-1.1: mínimo de caracteres da senha. */
+export const SENHA_MINIMA = 8;
 
 /** Corpo de erro da API: `{ "mensagem": "..." }`; `codigo` só em casos que a tela distingue (ex.: `"bloqueado"`). */
 export interface ErroApi {

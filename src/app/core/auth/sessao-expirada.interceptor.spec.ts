@@ -37,6 +37,28 @@ describe('sessaoExpiradaInterceptor', () => {
     await expect(chamada).rejects.toMatchObject({ status });
   }
 
+  it('403 de troca de senha obrigatória (senha redefinida com a sessão aberta) leva à troca de senha', async () => {
+    const chamada = firstValueFrom(cliente.get('/api/teste/pdv'));
+    http
+      .expectOne('/api/teste/pdv')
+      .flush({ mensagem: 'Defina uma nova senha para continuar', codigo: 'troca_de_senha_obrigatoria' }, { status: 403, statusText: 'Forbidden' });
+    await expect(chamada).rejects.toMatchObject({ status: 403 });
+
+    http.expectOne('/api/auth/me').flush({
+      usuario: 'ana', nome: 'Ana', perfil: 'Operador de caixa', permissoes: [], trocaDeSenhaObrigatoria: true,
+    });
+    await new Promise((r) => setTimeout(r));
+
+    expect(TestBed.inject(AuthService).trocaDeSenhaObrigatoria()).toBe(true);
+    expect(navegar).toHaveBeenCalledWith('/trocar-senha');
+  });
+
+  it('403 comum (sem a permissão) não navega', async () => {
+    await responder('/api/perfis', 403, 'Forbidden');
+
+    expect(navegar).not.toHaveBeenCalled();
+  });
+
   it('401 fora de /api/auth/* (sessão vencida) esquece o usuário e vai para o login', async () => {
     await responder('/api/configuracao/empresa', 401, 'Unauthorized');
 
