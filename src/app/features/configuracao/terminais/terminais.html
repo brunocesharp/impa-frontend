@@ -1,0 +1,157 @@
+<div class="topo">
+  <a mat-button routerLink="/configuracao">
+    <mat-icon>arrow_back</mat-icon>
+    Configuração
+  </a>
+</div>
+
+@if (carregando()) {
+  <p class="estado">Carregando terminais…</p>
+} @else {
+  <mat-card appearance="outlined" class="dispositivo">
+    @if (desteDispositivo(); as terminal) {
+      <div class="dispositivo-linha">
+        <mat-icon aria-hidden="true">verified</mat-icon>
+        <p>
+          Este dispositivo está registrado como <strong>{{ terminal.nome }}</strong> e pode usar o
+          PDV e o caixa.
+        </p>
+      </div>
+    } @else {
+      <form
+        [formGroup]="registro"
+        (ngSubmit)="registrar()"
+        novalidate
+        class="registrar"
+        data-registrar
+      >
+        <div class="dispositivo-linha">
+          <mat-icon aria-hidden="true">devices_off</mat-icon>
+          <p>
+            Este dispositivo não está registrado. Só terminais registrados usam o PDV e o caixa; as
+            demais funções funcionam em qualquer dispositivo.
+          </p>
+        </div>
+        <mat-form-field appearance="outline">
+          <mat-label>Nome do terminal</mat-label>
+          <input
+            matInput
+            data-campo="novo-nome"
+            formControlName="nome"
+            [maxlength]="nomeMaximo"
+            placeholder="Ex.: Balcão 1, Celular Loja"
+            autocomplete="off"
+          />
+          @if (registro.controls.nome.hasError('required')) {
+            <mat-error>Informe o nome do terminal</mat-error>
+          }
+        </mat-form-field>
+        <button mat-flat-button type="submit" [disabled]="salvando()">
+          <mat-icon>add_to_queue</mat-icon>
+          Registrar este dispositivo
+        </button>
+      </form>
+    }
+  </mat-card>
+
+  @if (erro() && !selecionado()) {
+    <p class="erro" role="alert">{{ erro() }}</p>
+  }
+  @if (aviso() && !selecionado()) {
+    <p class="aviso" role="status">{{ aviso() }}</p>
+  }
+
+  <div class="layout">
+    <mat-card appearance="outlined" class="lista">
+      <h2>Terminais</h2>
+      <ul role="list">
+        @for (terminal of terminais(); track terminal.id) {
+          <li>
+            <button
+              type="button"
+              class="item"
+              data-terminal
+              [class.ativo]="terminal.id === selecionado()"
+              [class.revogado]="!!terminal.revogadoEm"
+              [attr.aria-current]="terminal.id === selecionado() ? 'true' : null"
+              (click)="selecionar(terminal)"
+            >
+              <span class="item-nome">{{ terminal.nome }}</span>
+              <span class="item-info">
+                <span>{{ terminal.criadoPor }} · {{ terminal.criadoEm | date: 'dd/MM/yyyy' }}</span>
+                @if (terminal.atual && !terminal.revogadoEm) {
+                  <span class="selo" data-selo="atual"
+                    ><mat-icon aria-hidden="true">my_location</mat-icon>Este dispositivo</span
+                  >
+                }
+                @if (terminal.revogadoEm) {
+                  <span class="selo" data-selo="revogado"
+                    ><mat-icon aria-hidden="true">block</mat-icon>Revogado</span
+                  >
+                }
+              </span>
+            </button>
+          </li>
+        } @empty {
+          <li class="estado">Nenhum terminal registrado.</li>
+        }
+      </ul>
+    </mat-card>
+
+    @if (atual(); as terminal) {
+      <mat-card appearance="outlined" class="editor">
+        <h2>{{ terminal.nome }}</h2>
+        <p class="situacao" data-situacao>
+          @if (terminal.revogadoEm) {
+            Revogado em {{ terminal.revogadoEm | date: 'dd/MM/yyyy HH:mm' }} — não acessa o PDV nem
+            o caixa
+          } @else {
+            Registrado por {{ terminal.criadoPor }} em
+            {{ terminal.criadoEm | date: 'dd/MM/yyyy HH:mm' }}
+          }
+        </p>
+
+        <form [formGroup]="edicao" (ngSubmit)="renomear()" novalidate class="campos">
+          <mat-form-field appearance="outline">
+            <mat-label>Nome</mat-label>
+            <input
+              matInput
+              data-campo="nome"
+              formControlName="nome"
+              [maxlength]="nomeMaximo"
+              autocomplete="off"
+            />
+            @if (edicao.controls.nome.hasError('required')) {
+              <mat-error>Informe o nome do terminal</mat-error>
+            }
+          </mat-form-field>
+
+          @if (erro()) {
+            <p class="erro" role="alert">{{ erro() }}</p>
+          }
+          @if (aviso()) {
+            <p class="aviso" role="status">{{ aviso() }}</p>
+          }
+
+          @if (!terminal.revogadoEm) {
+            <div class="acoes">
+              <button
+                mat-button
+                type="button"
+                class="perigo"
+                data-acao="revogar"
+                [disabled]="salvando()"
+                (click)="revogar()"
+              >
+                <mat-icon>block</mat-icon>
+                {{ confirmandoRevogacao() ? 'Confirmar revogação' : 'Revogar' }}
+              </button>
+              <span class="espaco"></span>
+              <button mat-flat-button type="submit" [disabled]="salvando()">Salvar</button>
+            </div>
+          }
+        </form>
+      </mat-card>
+    }
+  </div>
+}

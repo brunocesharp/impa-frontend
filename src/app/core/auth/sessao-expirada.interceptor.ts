@@ -2,6 +2,7 @@ import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
+import { ehTerminalNaoRegistrado } from '../terminal/terminal.service';
 import { AuthService } from './auth.service';
 import { CODIGO_TROCA_DE_SENHA_OBRIGATORIA, ErroApi, MENSAGEM_SESSAO_ENCERRADA } from './sessao';
 
@@ -36,6 +37,10 @@ export const sessaoExpiradaInterceptor: HttpInterceptorFn = (requisicao, proximo
           () => router.navigateByUrl('/trocar-senha'),
           () => undefined,
         );
+      }
+      // PDV ou caixa com o terminal revogado no meio do uso (story 1-6): mostra a mensagem do cenário 11.6.
+      if (ehTerminalNaoRegistrado(erro) && requisicao.url !== '/api/terminais/atual') {
+        void router.navigateByUrl('/terminal-nao-registrado');
       }
       return throwError(() => erro);
     }),
