@@ -21,9 +21,16 @@ export const SECOES_CONFIGURACAO: readonly Secao[] = [
     icone: 'admin_panel_settings',
     permissao: 'perfis.gerenciar',
   },
+  {
+    rota: 'usuarios',
+    titulo: 'Usuários',
+    descricao: 'Quem acessa o sistema, com que perfil, e senhas provisórias',
+    icone: 'group',
+    permissao: 'usuarios.gerenciar',
+  },
 ];
 
-/** Configuração (story 1-3): ponto de entrada das seções; por enquanto, Perfis. */
+/** Configuração (stories 1-3 e 1-4): ponto de entrada das seções — Perfis e Usuários. */
 @Component({
   selector: 'app-configuracao',
   imports: [MatCardModule, MatIconModule, RouterLink],

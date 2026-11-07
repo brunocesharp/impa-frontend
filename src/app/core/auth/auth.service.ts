@@ -21,6 +21,13 @@ export type ResultadoEntrar =
   | { ok: false; mensagem: string; campos?: undefined }
   | { ok: false; mensagem: null; campos: Partial<Record<CampoLogin, string>> };
 
+export type CampoTrocaSenha = 'senhaAtual' | 'novaSenha';
+
+export type ResultadoTrocarSenha =
+  | { ok: true }
+  | { ok: false; mensagem: string; campos?: undefined }
+  | { ok: false; mensagem: null; campos: Partial<Record<CampoTrocaSenha, string>> };
+
 /**
  * Sessão do usuário. Quem decide é o servidor (cookie HttpOnly, ADR-006): aqui só se guarda
  * o que `GET /api/auth/me` respondeu, para a tela e o menu.
@@ -38,9 +45,36 @@ export class AuthService {
   readonly aviso = this._aviso.asReadonly();
   readonly autenticado = computed(() => this._sessao() !== null);
   readonly permissoes = computed<ReadonlySet<string>>(() => new Set(this._sessao()?.permissoes ?? []));
+  /** Senha provisória: o usuário fica preso na troca de senha até defini-la (story 1-4, RN-1.8). */
+  readonly trocaDeSenhaObrigatoria = computed(() => this._sessao()?.trocaDeSenhaObrigatoria === true);
 
   temPermissao(permissao: string): boolean {
     return this.permissoes().has(permissao);
+  }
+
+  /**
+   * Troca a senha do usuário da sessão (`POST /api/auth/trocar-senha`). Recusa do servidor (400) volta como
+   * `campos` (validação por campo) ou `mensagem`; depois da troca, a sessão é recarregada (marca desligada).
+   */
+  async trocarSenha(senhaAtual: string, novaSenha: string): Promise<ResultadoTrocarSenha> {
+    try {
+      await firstValueFrom(this.http.post<void>('/api/auth/trocar-senha', { senhaAtual, novaSenha }));
+    } catch (erro) {
+      if (!(erro instanceof HttpErrorResponse) || erro.status !== 400) throw erro;
+      const errors = (erro.error as { errors?: Record<string, string[]> } | null)?.errors;
+      if (errors && typeof errors === 'object') {
+        const campos: Partial<Record<CampoTrocaSenha, string>> = {};
+        for (const [chave, mensagens] of Object.entries(errors)) {
+          const campo = chave.toLowerCase() === 'senhaatual' ? 'senhaAtual' : chave.toLowerCase() === 'novasenha' ? 'novaSenha' : null;
+          if (campo && mensagens?.length) campos[campo] = mensagens[0];
+        }
+        if (Object.keys(campos).length) return { ok: false, mensagem: null, campos };
+      }
+      return { ok: false, mensagem: mensagemDe(erro) ?? 'Não foi possível trocar a senha. Recarregue a página.' };
+    }
+
+    await this.carregarSessao();
+    return { ok: true };
   }
 
   /** Consulta a sessão no servidor. Também entrega o cookie XSRF-TOKEN, exigido pelo login. */

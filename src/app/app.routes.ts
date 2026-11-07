@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { autenticadoGuard, permissaoGuard } from './core/auth/auth.guard';
+import { autenticadoGuard, permissaoGuard, trocaDeSenhaGuard } from './core/auth/auth.guard';
 import { MENU } from './core/menu/menu';
 
 /** Itens do menu que já têm tela própria (os demais levam a "Em construção"). */
@@ -10,6 +10,12 @@ export const routes: Routes = [
     path: 'login',
     title: 'Entrar · IMPA',
     loadComponent: () => import('./features/login/login').then((m) => m.Login),
+  },
+  {
+    path: 'trocar-senha',
+    title: 'Nova senha · IMPA',
+    canActivate: [trocaDeSenhaGuard],
+    loadComponent: () => import('./features/trocar-senha/trocar-senha').then((m) => m.TrocarSenha),
   },
   {
     path: 'indisponivel',
@@ -43,6 +49,13 @@ export const routes: Routes = [
         canActivate: [permissaoGuard],
         data: { titulo: 'Perfis', permissao: 'perfis.gerenciar' },
         loadComponent: () => import('./features/configuracao/perfis/perfis').then((m) => m.Perfis),
+      },
+      {
+        path: 'configuracao/usuarios',
+        title: 'Usuários · IMPA',
+        canActivate: [permissaoGuard],
+        data: { titulo: 'Usuários', permissao: 'usuarios.gerenciar' },
+        loadComponent: () => import('./features/configuracao/usuarios/usuarios').then((m) => m.Usuarios),
       },
       // Telas ainda não construídas: cada item do menu leva a "Em construção".
       ...MENU.filter((item) => item.rota !== '' && !COM_TELA.has(item.rota)).map((item) => ({
