@@ -1,3 +1,4 @@
+import { ApplicationRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -88,6 +89,73 @@ describe('Shell', () => {
       expect(TestBed.inject(AuthService).sessao()?.usuario).toBe('ana');
     });
   }
+
+  describe('sino de notificações (story 4-2)', () => {
+    const CONTAGEM = '/api/notificacoes/nao-lidas/contagem';
+    const PERMISSOES_ADMIN = [...PERMISSOES_OPERADOR, 'configuracao.ver', 'notificacoes.receber'];
+
+    function sino(elemento: HTMLElement): HTMLButtonElement | null {
+      return elemento.querySelector<HTMLButtonElement>('[data-sino]');
+    }
+
+    async function comContagem(elemento: HTMLElement, naoLidas: number): Promise<void> {
+      TestBed.inject(HttpTestingController).expectOne(CONTAGEM).flush({ naoLidas });
+      TestBed.inject(ApplicationRef).tick();
+      await vi.waitFor(() => expect(sino(elemento)).not.toBeNull());
+    }
+
+    it('não aparece para quem não tem notificacoes.receber, e o contador não é consultado', async () => {
+      const elemento = await renderizarCom(PERMISSOES_OPERADOR);
+
+      expect(sino(elemento)).toBeNull();
+      TestBed.inject(HttpTestingController).expectNone(CONTAGEM);
+    });
+
+    it('aparece com notificacoes.receber e mostra o contador de não lidas', async () => {
+      const elemento = await renderizarCom(PERMISSOES_ADMIN);
+      await comContagem(elemento, 1);
+
+      await vi.waitFor(() => expect(elemento.querySelector('[data-contador]')?.textContent?.trim()).toBe('1'));
+      expect(sino(elemento)!.getAttribute('aria-label')).toBe('Notificações: 1 não lida');
+    });
+
+    it('sem não lidas, o sino fica sem contador', async () => {
+      const elemento = await renderizarCom(PERMISSOES_ADMIN);
+      await comContagem(elemento, 0);
+
+      expect(elemento.querySelector('[data-contador]')).toBeNull();
+    });
+
+    it('abrir o painel lista as notificações; marcar como lida e marcar todas atualizam o contador', async () => {
+      const elemento = await renderizarCom(PERMISSOES_ADMIN);
+      const http = TestBed.inject(HttpTestingController);
+      await comContagem(elemento, 2);
+
+      sino(elemento)!.click();
+      http.expectOne((r) => r.url === '/api/notificacoes').flush({
+        itens: [
+          { id: 'a', tipo: 't', titulo: 'Saldo negativo', texto: 'Caneta azul 0.7 ficou com saldo -1', referenciaDaOrigem: null, criadaEm: '2026-11-07T10:00:00Z', lida: false },
+          { id: 'b', tipo: 't', titulo: 'Saldo negativo', texto: 'Borracha ficou com saldo -2', referenciaDaOrigem: null, criadaEm: '2026-11-07T09:00:00Z', lida: false },
+        ],
+        pagina: 1,
+        tamanhoDaPagina: 20,
+        total: 2,
+      });
+      http.expectOne(CONTAGEM).flush({ naoLidas: 2 });
+      await vi.waitFor(() => expect(document.querySelectorAll('[data-notificacao]').length).toBe(2));
+      expect(document.body.textContent).toContain('Caneta azul 0.7 ficou com saldo -1');
+
+      document.querySelector<HTMLButtonElement>('[data-notificacao] [data-marcar-lida]')!.click();
+      http.expectOne('/api/notificacoes/a/lida').flush(null, { status: 204, statusText: 'No Content' });
+      await vi.waitFor(() => expect(elemento.querySelector('[data-contador]')?.textContent?.trim()).toBe('1'));
+      expect(document.querySelectorAll('[data-marcar-lida]').length).toBe(1);
+
+      document.querySelector<HTMLButtonElement>('[data-marcar-todas]')!.click();
+      http.expectOne('/api/notificacoes/lidas').flush(null, { status: 204, statusText: 'No Content' });
+      await vi.waitFor(() => expect(elemento.querySelector('[data-contador]')).toBeNull());
+      expect(document.querySelectorAll('[data-marcar-lida]').length).toBe(0);
+    });
+  });
 
   it('rodapé mostra a versão do front e a da API', async () => {
     const elemento = await renderizarCom(PERMISSOES_OPERADOR);

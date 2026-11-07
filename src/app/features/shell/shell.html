@@ -38,6 +38,10 @@
       <h1 class="titulo">{{ titulo() }}</h1>
       <span class="espaco"></span>
 
+      @if (recebeNotificacoes()) {
+        <app-sino-notificacoes />
+      }
+
       <button mat-icon-button type="button" [matMenuTriggerFor]="menuTema" aria-label="Tema" title="Tema">
         <mat-icon>{{ tema.escuro() ? 'dark_mode' : 'light_mode' }}</mat-icon>
       </button>
