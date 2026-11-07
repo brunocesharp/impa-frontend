@@ -28,9 +28,16 @@ export const SECOES_CONFIGURACAO: readonly Secao[] = [
     icone: 'group',
     permissao: 'usuarios.gerenciar',
   },
+  {
+    rota: 'terminais',
+    titulo: 'Terminais',
+    descricao: 'Computadores e celulares que podem usar o PDV e o caixa',
+    icone: 'devices',
+    permissao: 'terminais.gerenciar',
+  },
 ];
 
-/** Configuração (stories 1-3 e 1-4): ponto de entrada das seções — Perfis e Usuários. */
+/** Configuração (stories 1-3, 1-4 e 1-6): ponto de entrada das seções — Perfis, Usuários e Terminais. */
 @Component({
   selector: 'app-configuracao',
   imports: [MatCardModule, MatIconModule, RouterLink],

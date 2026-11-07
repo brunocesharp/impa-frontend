@@ -53,6 +53,28 @@ describe('sessaoExpiradaInterceptor', () => {
     expect(navegar).toHaveBeenCalledWith('/trocar-senha');
   });
 
+  it('403 de terminal não registrado (terminal revogado no meio do uso) leva à mensagem do cenário 11.6', async () => {
+    const chamada = firstValueFrom(cliente.post('/api/caixa/abrir', null));
+    http.expectOne('/api/caixa/abrir').flush(
+      { mensagem: 'Este computador não está registrado como terminal. Peça ao administrador', codigo: 'terminal_nao_registrado' },
+      { status: 403, statusText: 'Forbidden' },
+    );
+    await expect(chamada).rejects.toMatchObject({ status: 403 });
+
+    expect(navegar).toHaveBeenCalledWith('/terminal-nao-registrado');
+  });
+
+  it('403 de terminal não registrado no /api/terminais/atual fica com o guard (não navega)', async () => {
+    const chamada = firstValueFrom(cliente.get('/api/terminais/atual'));
+    http.expectOne('/api/terminais/atual').flush(
+      { mensagem: 'x', codigo: 'terminal_nao_registrado' },
+      { status: 403, statusText: 'Forbidden' },
+    );
+    await expect(chamada).rejects.toMatchObject({ status: 403 });
+
+    expect(navegar).not.toHaveBeenCalled();
+  });
+
   it('403 comum (sem a permissão) não navega', async () => {
     await responder('/api/perfis', 403, 'Forbidden');
 
