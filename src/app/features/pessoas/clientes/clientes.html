@@ -1,0 +1,199 @@
+<div class="layout">
+  <mat-card appearance="outlined" class="lista">
+    <div class="lista-cabecalho">
+      <h2>Clientes</h2>
+      @if (podeEditar()) {
+        <button mat-flat-button type="button" data-acao="novo" (click)="criarNovo()">
+          <mat-icon>person_add</mat-icon>
+          Novo cliente
+        </button>
+      }
+    </div>
+
+    <form class="busca" (submit)="$event.preventDefault(); buscar()">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Buscar por nome, CPF/CNPJ ou telefone</mat-label>
+        <input matInput data-campo="busca" [formControl]="busca" autocomplete="off" />
+        <button matIconButton matSuffix type="submit" aria-label="Buscar">
+          <mat-icon>search</mat-icon>
+        </button>
+      </mat-form-field>
+      <mat-checkbox data-campo="inativos" [formControl]="incluirInativos" (change)="buscar()"
+        >Mostrar inativos</mat-checkbox
+      >
+    </form>
+
+    @if (!selecionado() && aviso()) {
+      <p class="aviso" role="status">{{ aviso() }}</p>
+    }
+
+    @if (carregando()) {
+      <p class="estado">Carregando clientes…</p>
+    } @else {
+      <ul role="list">
+        @for (cliente of clientes(); track cliente.id) {
+          <li>
+            <button
+              type="button"
+              class="item"
+              data-cliente
+              [class.ativo]="cliente.id === selecionado()"
+              [class.inativo]="!cliente.ativo"
+              [attr.aria-current]="cliente.id === selecionado() ? 'true' : null"
+              (click)="selecionar(cliente)"
+            >
+              <span class="item-nome">{{ cliente.nome }}</span>
+              <span class="item-info">
+                @if (cliente.documento) {
+                  <span>{{ cliente.documento }}</span>
+                }
+                @if (cliente.telefone) {
+                  <span>{{ telefone(cliente.telefone) }}</span>
+                }
+                @if (!cliente.ativo) {
+                  <span class="selo" data-selo="inativo"
+                    ><mat-icon aria-hidden="true">block</mat-icon>Inativo</span
+                  >
+                }
+              </span>
+            </button>
+          </li>
+        } @empty {
+          <li class="estado">Nenhum cliente encontrado.</li>
+        }
+      </ul>
+    }
+  </mat-card>
+
+  @if (selecionado()) {
+    <mat-card appearance="outlined" class="editor">
+      <h2>{{ novo() ? 'Novo cliente' : atual()?.nome }}</h2>
+
+      @if (!novo() && atual(); as cliente) {
+        <p class="situacao" data-situacao>
+          {{ cliente.ativo ? 'Ativo' : 'Inativo — não aparece na busca do PDV' }}
+        </p>
+      }
+
+      <form [formGroup]="formulario" (ngSubmit)="salvar()" novalidate class="campos">
+        <mat-form-field appearance="outline">
+          <mat-label>Nome</mat-label>
+          <input
+            matInput
+            data-campo="nome"
+            formControlName="nome"
+            maxlength="150"
+            autocomplete="off"
+          />
+          @if (formulario.controls.nome.hasError('required')) {
+            <mat-error>Informe o nome</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>CPF ou CNPJ (opcional)</mat-label>
+          <input matInput data-campo="documento" formControlName="documento" autocomplete="off" />
+          @if (formulario.controls.documento.getError('documento'); as mensagem) {
+            <mat-error data-erro="documento">{{ mensagem }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Telefone (opcional)</mat-label>
+          <input
+            matInput
+            type="tel"
+            data-campo="telefone"
+            formControlName="telefone"
+            autocomplete="off"
+          />
+          @if (formulario.controls.telefone.invalid) {
+            <mat-error>Telefone inválido</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>E-mail (opcional)</mat-label>
+          <input
+            matInput
+            type="email"
+            data-campo="email"
+            formControlName="email"
+            autocomplete="off"
+          />
+          @if (formulario.controls.email.hasError('email')) {
+            <mat-error>E-mail inválido</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="largo">
+          <mat-label>Endereço (opcional)</mat-label>
+          <input
+            matInput
+            data-campo="endereco"
+            formControlName="endereco"
+            maxlength="300"
+            autocomplete="off"
+          />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="largo">
+          <mat-label>Observações (opcional)</mat-label>
+          <textarea
+            matInput
+            data-campo="observacoes"
+            formControlName="observacoes"
+            maxlength="1000"
+            rows="3"
+          ></textarea>
+        </mat-form-field>
+
+        @if (erro()) {
+          <p class="erro" role="alert">{{ erro() }}</p>
+        }
+        @if (aviso()) {
+          <p class="aviso" role="status">{{ aviso() }}</p>
+        }
+
+        <div class="acoes">
+          @if (!novo() && podeInativar() && atual(); as cliente) {
+            <button
+              mat-button
+              type="button"
+              data-acao="situacao"
+              [class.perigo]="cliente.ativo"
+              [disabled]="salvando()"
+              (click)="alternarSituacao()"
+            >
+              <mat-icon>{{ cliente.ativo ? 'person_off' : 'person_check' }}</mat-icon>
+              {{
+                cliente.ativo
+                  ? confirmando() === 'inativar'
+                    ? 'Confirmar inativação'
+                    : 'Inativar'
+                  : 'Reativar'
+              }}
+            </button>
+            <button
+              mat-button
+              type="button"
+              class="perigo"
+              data-acao="excluir"
+              [disabled]="salvando()"
+              (click)="excluir()"
+            >
+              <mat-icon>delete</mat-icon>
+              {{ confirmando() === 'excluir' ? 'Confirmar exclusão' : 'Excluir' }}
+            </button>
+          }
+          <span class="espaco"></span>
+          @if (podeEditar()) {
+            <button mat-flat-button type="submit" data-acao="salvar" [disabled]="salvando()">
+              {{ novo() ? 'Cadastrar cliente' : 'Salvar' }}
+            </button>
+          }
+        </div>
+      </form>
+    </mat-card>
+  }
+</div>

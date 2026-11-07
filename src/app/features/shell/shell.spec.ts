@@ -38,7 +38,7 @@ describe('Shell', () => {
   it('menu do Operador de caixa não mostra Configuração, Contas a pagar nem Importação', async () => {
     const itens = itensDoMenu(await renderizarCom(PERMISSOES_OPERADOR));
 
-    expect(itens).toEqual(['Início', 'Vendas', 'Estoque', 'Caixa']);
+    expect(itens).toEqual(['Início', 'Vendas', 'Estoque', 'Caixa', 'Pessoas']);
   });
 
   it('menu do Administrador mostra todas as funções', async () => {
@@ -46,7 +46,7 @@ describe('Shell', () => {
       await renderizarCom([...PERMISSOES_OPERADOR, 'financeiro.ver', 'importacao.executar', 'configuracao.ver']),
     );
 
-    expect(itens).toEqual(['Início', 'Vendas', 'Estoque', 'Caixa', 'Contas', 'Importação', 'Configuração']);
+    expect(itens).toEqual(['Início', 'Vendas', 'Estoque', 'Caixa', 'Pessoas', 'Contas', 'Importação', 'Configuração']);
   });
 
   it('mostra o nome do usuário na barra superior', async () => {

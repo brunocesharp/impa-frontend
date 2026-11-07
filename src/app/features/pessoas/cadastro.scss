@@ -1,0 +1,146 @@
+:host {
+  display: block;
+}
+
+.estado {
+  color: var(--impa-texto-secundario);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 380px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+
+  @media (max-width: 840px) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+mat-card {
+  padding: 16px;
+  background: var(--impa-superficie);
+}
+
+h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.lista-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.busca {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    background: color-mix(in srgb, currentColor 8%, transparent);
+  }
+
+  &.ativo {
+    background: color-mix(in srgb, currentColor 12%, transparent);
+    font-weight: 600;
+  }
+
+  &.inativo .item-nome {
+    color: var(--impa-texto-secundario);
+  }
+}
+
+.item-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--impa-texto-secundario);
+}
+
+.selo {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.editor {
+  display: grid;
+  gap: 12px;
+}
+
+.situacao {
+  margin: 0;
+  color: var(--impa-texto-secundario);
+}
+
+.campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 4px 16px;
+}
+
+.largo,
+.erro,
+.aviso,
+.acoes {
+  grid-column: 1 / -1;
+}
+
+.erro {
+  margin: 0;
+  color: var(--mat-sys-error);
+}
+
+.aviso {
+  margin: 0;
+  color: var(--impa-texto-secundario);
+}
+
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.espaco {
+  flex: 1;
+}
+
+.perigo {
+  color: var(--mat-sys-error);
+}

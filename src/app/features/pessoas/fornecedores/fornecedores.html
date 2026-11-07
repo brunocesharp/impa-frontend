@@ -1,0 +1,191 @@
+<div class="layout">
+  <mat-card appearance="outlined" class="lista">
+    <div class="lista-cabecalho">
+      <h2>Fornecedores</h2>
+      <button mat-flat-button type="button" data-acao="novo" (click)="criarNovo()">
+        <mat-icon>add_business</mat-icon>
+        Novo fornecedor
+      </button>
+    </div>
+
+    <form class="busca" (submit)="$event.preventDefault(); buscar()">
+      <mat-form-field appearance="outline" subscriptSizing="dynamic">
+        <mat-label>Buscar por razão social, nome fantasia ou CNPJ</mat-label>
+        <input matInput data-campo="busca" [formControl]="busca" autocomplete="off" />
+        <button matIconButton matSuffix type="submit" aria-label="Buscar">
+          <mat-icon>search</mat-icon>
+        </button>
+      </mat-form-field>
+      <mat-checkbox data-campo="inativos" [formControl]="incluirInativos" (change)="buscar()"
+        >Mostrar inativos</mat-checkbox
+      >
+    </form>
+
+    @if (!selecionado() && aviso()) {
+      <p class="aviso" role="status">{{ aviso() }}</p>
+    }
+
+    @if (carregando()) {
+      <p class="estado">Carregando fornecedores…</p>
+    } @else {
+      <ul role="list">
+        @for (fornecedor of fornecedores(); track fornecedor.id) {
+          <li>
+            <button
+              type="button"
+              class="item"
+              data-fornecedor
+              [class.ativo]="fornecedor.id === selecionado()"
+              [class.inativo]="!fornecedor.ativo"
+              [attr.aria-current]="fornecedor.id === selecionado() ? 'true' : null"
+              (click)="selecionar(fornecedor)"
+            >
+              <span class="item-nome">{{ fornecedor.razaoSocial }}</span>
+              <span class="item-info">
+                @if (fornecedor.nomeFantasia) {
+                  <span>{{ fornecedor.nomeFantasia }}</span>
+                }
+                <span>{{ fornecedor.documento }}</span>
+                @if (!fornecedor.ativo) {
+                  <span class="selo" data-selo="inativo"
+                    ><mat-icon aria-hidden="true">block</mat-icon>Inativo</span
+                  >
+                }
+              </span>
+            </button>
+          </li>
+        } @empty {
+          <li class="estado">Nenhum fornecedor encontrado.</li>
+        }
+      </ul>
+    }
+  </mat-card>
+
+  @if (selecionado()) {
+    <mat-card appearance="outlined" class="editor">
+      <h2>{{ novo() ? 'Novo fornecedor' : atual()?.razaoSocial }}</h2>
+
+      @if (!novo() && atual(); as fornecedor) {
+        <p class="situacao" data-situacao>{{ fornecedor.ativo ? 'Ativo' : 'Inativo' }}</p>
+      }
+
+      <form [formGroup]="formulario" (ngSubmit)="salvar()" novalidate class="campos">
+        <mat-form-field appearance="outline">
+          <mat-label>Razão social</mat-label>
+          <input
+            matInput
+            data-campo="razaoSocial"
+            formControlName="razaoSocial"
+            maxlength="150"
+            autocomplete="off"
+          />
+          @if (formulario.controls.razaoSocial.hasError('required')) {
+            <mat-error>Informe a razão social</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>CNPJ ou CPF</mat-label>
+          <input matInput data-campo="documento" formControlName="documento" autocomplete="off" />
+          @if (formulario.controls.documento.getError('documento'); as mensagem) {
+            <mat-error data-erro="documento">{{ mensagem }}</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Nome fantasia (opcional)</mat-label>
+          <input
+            matInput
+            data-campo="nomeFantasia"
+            formControlName="nomeFantasia"
+            maxlength="150"
+            autocomplete="off"
+          />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Telefone (opcional)</mat-label>
+          <input
+            matInput
+            type="tel"
+            data-campo="telefone"
+            formControlName="telefone"
+            autocomplete="off"
+          />
+          @if (formulario.controls.telefone.invalid) {
+            <mat-error>Telefone inválido</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>E-mail (opcional)</mat-label>
+          <input
+            matInput
+            type="email"
+            data-campo="email"
+            formControlName="email"
+            autocomplete="off"
+          />
+          @if (formulario.controls.email.hasError('email')) {
+            <mat-error>E-mail inválido</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Contato (opcional)</mat-label>
+          <input
+            matInput
+            data-campo="contato"
+            formControlName="contato"
+            maxlength="150"
+            autocomplete="off"
+          />
+        </mat-form-field>
+
+        @if (erro()) {
+          <p class="erro" role="alert">{{ erro() }}</p>
+        }
+        @if (aviso()) {
+          <p class="aviso" role="status">{{ aviso() }}</p>
+        }
+
+        <div class="acoes">
+          @if (!novo() && atual(); as fornecedor) {
+            <button
+              mat-button
+              type="button"
+              data-acao="situacao"
+              [class.perigo]="fornecedor.ativo"
+              [disabled]="salvando()"
+              (click)="alternarSituacao()"
+            >
+              <mat-icon>{{ fornecedor.ativo ? 'block' : 'check_circle' }}</mat-icon>
+              {{
+                fornecedor.ativo
+                  ? confirmando() === 'inativar'
+                    ? 'Confirmar inativação'
+                    : 'Inativar'
+                  : 'Reativar'
+              }}
+            </button>
+            <button
+              mat-button
+              type="button"
+              class="perigo"
+              data-acao="excluir"
+              [disabled]="salvando()"
+              (click)="excluir()"
+            >
+              <mat-icon>delete</mat-icon>
+              {{ confirmando() === 'excluir' ? 'Confirmar exclusão' : 'Excluir' }}
+            </button>
+          }
+          <span class="espaco"></span>
+          <button mat-flat-button type="submit" data-acao="salvar" [disabled]="salvando()">
+            {{ novo() ? 'Cadastrar fornecedor' : 'Salvar' }}
+          </button>
+        </div>
+      </form>
+    </mat-card>
+  }
+</div>

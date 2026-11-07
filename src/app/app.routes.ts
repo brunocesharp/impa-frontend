@@ -3,7 +3,7 @@ import { autenticadoGuard, permissaoGuard, trocaDeSenhaGuard } from './core/auth
 import { MENU } from './core/menu/menu';
 
 /** Itens do menu que já têm tela própria (os demais levam a "Em construção"). */
-const COM_TELA = new Set(['configuracao']);
+const COM_TELA = new Set(['configuracao', 'pessoas']);
 
 export const routes: Routes = [
   {
@@ -55,7 +55,33 @@ export const routes: Routes = [
         title: 'Usuários · IMPA',
         canActivate: [permissaoGuard],
         data: { titulo: 'Usuários', permissao: 'usuarios.gerenciar' },
-        loadComponent: () => import('./features/configuracao/usuarios/usuarios').then((m) => m.Usuarios),
+        loadComponent: () =>
+          import('./features/configuracao/usuarios/usuarios').then((m) => m.Usuarios),
+      },
+      {
+        // Story 3-7: abas Clientes e Fornecedores (decisão de 07/11/2026).
+        path: 'pessoas',
+        canActivate: [permissaoGuard],
+        data: { titulo: 'Pessoas', permissao: 'clientes.ver' },
+        loadComponent: () => import('./features/pessoas/pessoas').then((m) => m.Pessoas),
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: 'clientes' },
+          {
+            path: 'clientes',
+            title: 'Clientes · IMPA',
+            data: { titulo: 'Clientes' },
+            loadComponent: () =>
+              import('./features/pessoas/clientes/clientes').then((m) => m.Clientes),
+          },
+          {
+            path: 'fornecedores',
+            title: 'Fornecedores · IMPA',
+            canActivate: [permissaoGuard],
+            data: { titulo: 'Fornecedores', permissao: 'fornecedores.gerenciar' },
+            loadComponent: () =>
+              import('./features/pessoas/fornecedores/fornecedores').then((m) => m.Fornecedores),
+          },
+        ],
       },
       // Telas ainda não construídas: cada item do menu leva a "Em construção".
       ...MENU.filter((item) => item.rota !== '' && !COM_TELA.has(item.rota)).map((item) => ({
