@@ -10,6 +10,13 @@
 
     <h1>Entrar</h1>
 
+    @if (auth.aviso(); as aviso) {
+      <p class="aviso" role="status">
+        <mat-icon aria-hidden="true">info</mat-icon>
+        <span>{{ aviso }}</span>
+      </p>
+    }
+
     <form [formGroup]="formulario" (ngSubmit)="entrar()" novalidate>
       <mat-form-field appearance="outline">
         <mat-label>Usuário</mat-label>

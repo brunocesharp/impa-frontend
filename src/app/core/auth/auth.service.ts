@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { ErroApi, MENSAGEM_CREDENCIAL_INVALIDA, Sessao } from './sessao';
+import { CODIGO_BLOQUEADO, ErroApi, MENSAGEM_BLOQUEADO, MENSAGEM_CREDENCIAL_INVALIDA, Sessao } from './sessao';
 
 export type CampoLogin = 'usuario' | 'senha';
 
@@ -23,9 +23,12 @@ export class AuthService {
   private readonly http = inject(HttpClient);
 
   private readonly _sessao = signal<Sessao | null>(null);
+  private readonly _aviso = signal<string | null>(null);
   private consultada = false;
 
   readonly sessao = this._sessao.asReadonly();
+  /** Aviso para a tela de login, como "Sua sessão foi encerrada"; some na próxima tentativa de entrar. */
+  readonly aviso = this._aviso.asReadonly();
   readonly autenticado = computed(() => this._sessao() !== null);
   readonly permissoes = computed<ReadonlySet<string>>(() => new Set(this._sessao()?.permissoes ?? []));
 
@@ -51,12 +54,15 @@ export class AuthService {
   }
 
   async entrar(usuario: string, senha: string): Promise<ResultadoEntrar> {
+    this._aviso.set(null); // nova tentativa: o aviso de sessão encerrada já foi visto
     try {
       await firstValueFrom(this.http.post<void>('/api/auth/login', { usuario, senha }));
     } catch (erro) {
       if (!(erro instanceof HttpErrorResponse)) throw erro;
-      if (erro.status === 401)
-        return { ok: false, mensagem: mensagemDe(erro) ?? MENSAGEM_CREDENCIAL_INVALIDA };
+      if (erro.status === 401) {
+        const padrao = codigoDe(erro) === CODIGO_BLOQUEADO ? MENSAGEM_BLOQUEADO : MENSAGEM_CREDENCIAL_INVALIDA;
+        return { ok: false, mensagem: mensagemDe(erro) ?? padrao };
+      }
       if (erro.status === 400) {
         // Validação (ValidationProblem): mensagem por campo. Senão, token XSRF ausente/vencido (aba antiga).
         const campos = camposDe(erro);
@@ -85,11 +91,21 @@ export class AuthService {
     this.encerrarLocalmente();
   }
 
-  /** A sessão acabou no servidor (401 em qualquer chamada): esquece o usuário. */
-  encerrarLocalmente(): void {
+  /**
+   * A sessão acabou no servidor (401 em qualquer chamada): esquece o usuário. `aviso` fica para a tela de login
+   * mostrar (ex.: "Sua sessão foi encerrada"). Sem aviso, o anterior continua: um segundo 401 da mesma
+   * revogação não o apaga (R1); ele só some na próxima tentativa de entrar.
+   */
+  encerrarLocalmente(aviso: string | null = null): void {
     this._sessao.set(null);
+    if (aviso) this._aviso.set(aviso);
     this.consultada = true;
   }
+}
+
+function codigoDe(erro: HttpErrorResponse): string | null {
+  const codigo = (erro.error as Partial<ErroApi> | null)?.codigo;
+  return typeof codigo === 'string' ? codigo : null;
 }
 
 function mensagemDe(erro: HttpErrorResponse): string | null {

@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router, provideRouter } from '@angular/router';
+import { AuthService } from '../../core/auth/auth.service';
 import { Login } from './login';
 
 describe('Login', () => {
@@ -117,6 +118,55 @@ describe('Login', () => {
     await vi.waitFor(async () => {
       await fixture.whenStable();
       expect(elemento.querySelector('[role="alert"]')?.textContent).toContain('Mensagem do servidor');
+    });
+  });
+
+  it('401 de bloqueio (codigo "bloqueado") mostra a mensagem de bloqueio', async () => {
+    const fixture = await abrirTela();
+    const elemento = fixture.nativeElement as HTMLElement;
+
+    preencherEEntrar(elemento, 'ana', 'balcao2026');
+    (await requisicao('/api/auth/login')).flush(
+      { mensagem: 'Usuário bloqueado temporariamente. Tente novamente em 15 minutos', codigo: 'bloqueado' },
+      { status: 401, statusText: 'Unauthorized' },
+    );
+
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(elemento.querySelector('[role="alert"]')?.textContent).toContain(
+        'Usuário bloqueado temporariamente. Tente novamente em 15 minutos',
+      );
+    });
+  });
+
+  it('401 de bloqueio sem mensagem usa o texto padrão do bloqueio', async () => {
+    const fixture = await abrirTela();
+    const elemento = fixture.nativeElement as HTMLElement;
+
+    preencherEEntrar(elemento, 'ana', 'balcao2026');
+    (await requisicao('/api/auth/login')).flush({ codigo: 'bloqueado' }, { status: 401, statusText: 'Unauthorized' });
+
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(elemento.querySelector('[role="alert"]')?.textContent).toContain('Usuário bloqueado temporariamente');
+    });
+  });
+
+  it('sessão encerrada no servidor: a tela mostra "Sua sessão foi encerrada" até a próxima tentativa', async () => {
+    const fixture = criarTela();
+    TestBed.inject(AuthService).encerrarLocalmente('Sua sessão foi encerrada');
+    http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const elemento = fixture.nativeElement as HTMLElement;
+
+    expect(elemento.querySelector('[role="status"]')?.textContent).toContain('Sua sessão foi encerrada');
+
+    preencherEEntrar(elemento, 'ana', 'errada123');
+    (await requisicao('/api/auth/login')).flush({ mensagem: 'Usuário ou senha inválidos' }, { status: 401, statusText: 'Unauthorized' });
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(elemento.querySelector('[role="status"]')).toBeNull();
     });
   });
 
