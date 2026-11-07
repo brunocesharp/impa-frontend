@@ -3,7 +3,7 @@ import { autenticadoGuard, permissaoGuard, trocaDeSenhaGuard } from './core/auth
 import { MENU } from './core/menu/menu';
 
 /** Itens do menu que já têm tela própria (os demais levam a "Em construção"). */
-const COM_TELA = new Set(['configuracao', 'pessoas']);
+const COM_TELA = new Set(['configuracao', 'pessoas', 'contas']);
 
 export const routes: Routes = [
   {
@@ -80,6 +80,30 @@ export const routes: Routes = [
             data: { titulo: 'Fornecedores', permissao: 'fornecedores.gerenciar' },
             loadComponent: () =>
               import('./features/pessoas/fornecedores/fornecedores').then((m) => m.Fornecedores),
+          },
+        ],
+      },
+      {
+        // Story 11-1: contas a pagar e categorias financeiras, em abas.
+        path: 'contas',
+        canActivate: [permissaoGuard],
+        data: { titulo: 'Contas', permissao: 'financeiro.ver' },
+        loadComponent: () => import('./features/financeiro/financeiro').then((m) => m.Financeiro),
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: 'a-pagar' },
+          {
+            path: 'a-pagar',
+            title: 'Contas a pagar · IMPA',
+            data: { titulo: 'Contas a pagar' },
+            loadComponent: () =>
+              import('./features/financeiro/contas/contas').then((m) => m.Contas),
+          },
+          {
+            path: 'categorias',
+            title: 'Categorias financeiras · IMPA',
+            data: { titulo: 'Categorias financeiras' },
+            loadComponent: () =>
+              import('./features/financeiro/categorias/categorias').then((m) => m.Categorias),
           },
         ],
       },

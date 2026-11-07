@@ -1,0 +1,129 @@
+<div class="layout">
+  <mat-card appearance="outlined" class="lista">
+    <div class="lista-cabecalho">
+      <h2>Categorias</h2>
+      @if (podeEditar()) {
+        <button mat-flat-button type="button" data-acao="novo" (click)="criarNova()">
+          <mat-icon>add</mat-icon>
+          Nova categoria
+        </button>
+      }
+    </div>
+
+    <div class="busca">
+      <mat-checkbox data-campo="inativas" [formControl]="incluirInativas" (change)="carregar()"
+        >Mostrar inativas</mat-checkbox
+      >
+    </div>
+
+    @if (!selecionada() && aviso()) {
+      <p class="aviso" role="status">{{ aviso() }}</p>
+    }
+    @if (!selecionada() && erro()) {
+      <p class="erro" role="alert">{{ erro() }}</p>
+    }
+
+    @if (carregando()) {
+      <p class="estado">Carregando categorias…</p>
+    } @else {
+      <ul role="list">
+        @for (categoria of categorias(); track categoria.id) {
+          <li>
+            <button
+              type="button"
+              class="item"
+              data-categoria
+              [class.ativo]="categoria.id === selecionada()"
+              [class.inativo]="!categoria.ativa"
+              [attr.aria-current]="categoria.id === selecionada() ? 'true' : null"
+              (click)="selecionar(categoria)"
+            >
+              <span class="item-nome">{{ categoria.nome }}</span>
+              @if (!categoria.ativa) {
+                <span class="item-info"
+                  ><span class="selo" data-selo="inativa"
+                    ><mat-icon aria-hidden="true">block</mat-icon>Inativa</span
+                  ></span
+                >
+              }
+            </button>
+          </li>
+        } @empty {
+          <li class="estado">Nenhuma categoria cadastrada.</li>
+        }
+      </ul>
+    }
+  </mat-card>
+
+  @if (selecionada()) {
+    <mat-card appearance="outlined" class="editor">
+      <h2>{{ nova() ? 'Nova categoria' : atual()?.nome }}</h2>
+
+      @if (!nova() && atual(); as categoria) {
+        <p class="situacao" data-situacao>{{ categoria.ativa ? 'Ativa' : 'Inativa' }}</p>
+      }
+
+      <form (submit)="$event.preventDefault(); salvar()" novalidate class="campos">
+        <mat-form-field appearance="outline" class="largo">
+          <mat-label>Nome</mat-label>
+          <input
+            matInput
+            data-campo="nome"
+            [formControl]="nome"
+            maxlength="100"
+            autocomplete="off"
+          />
+          @if (nome.hasError('required')) {
+            <mat-error>Informe o nome da categoria</mat-error>
+          }
+        </mat-form-field>
+
+        @if (erro()) {
+          <p class="erro" role="alert">{{ erro() }}</p>
+        }
+        @if (aviso()) {
+          <p class="aviso" role="status">{{ aviso() }}</p>
+        }
+
+        @if (podeEditar()) {
+          <div class="acoes">
+            @if (!nova() && atual(); as categoria) {
+              <button
+                mat-button
+                type="button"
+                data-acao="situacao"
+                [class.perigo]="categoria.ativa"
+                [disabled]="salvando()"
+                (click)="alternarSituacao()"
+              >
+                <mat-icon>{{ categoria.ativa ? 'block' : 'check_circle' }}</mat-icon>
+                {{
+                  categoria.ativa
+                    ? confirmando() === 'inativar'
+                      ? 'Confirmar inativação'
+                      : 'Inativar'
+                    : 'Reativar'
+                }}
+              </button>
+              <button
+                mat-button
+                type="button"
+                class="perigo"
+                data-acao="excluir"
+                [disabled]="salvando()"
+                (click)="excluir()"
+              >
+                <mat-icon>delete</mat-icon>
+                {{ confirmando() === 'excluir' ? 'Confirmar exclusão' : 'Excluir' }}
+              </button>
+            }
+            <span class="espaco"></span>
+            <button mat-flat-button type="submit" data-acao="salvar" [disabled]="salvando()">
+              {{ nova() ? 'Cadastrar categoria' : 'Salvar' }}
+            </button>
+          </div>
+        }
+      </form>
+    </mat-card>
+  }
+</div>

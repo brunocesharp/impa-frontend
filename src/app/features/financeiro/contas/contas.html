@@ -1,0 +1,239 @@
+<div class="layout">
+  <mat-card appearance="outlined" class="lista">
+    <div class="lista-cabecalho">
+      <h2>Contas a pagar</h2>
+      @if (podeEditar()) {
+        <button mat-flat-button type="button" data-acao="novo" (click)="criarNova()">
+          <mat-icon>add</mat-icon>
+          Lançar conta
+        </button>
+      }
+    </div>
+
+    @if (!selecionada() && aviso()) {
+      <p class="aviso" role="status">{{ aviso() }}</p>
+    }
+    @if (!selecionada() && erro()) {
+      <p class="erro" role="alert">{{ erro() }}</p>
+    }
+
+    @if (carregando()) {
+      <p class="estado">Carregando contas…</p>
+    } @else {
+      <ul role="list">
+        @for (conta of contas(); track conta.id) {
+          <li>
+            <button
+              type="button"
+              class="item"
+              data-conta
+              [class.ativo]="conta.id === selecionada()"
+              [attr.aria-current]="conta.id === selecionada() ? 'true' : null"
+              (click)="selecionar(conta)"
+            >
+              <span class="item-nome conta-linha">
+                <span>
+                  {{ conta.descricao }}
+                  @if (conta.totalDeParcelas > 1) {
+                    <span class="parcela">{{ conta.parcela }}/{{ conta.totalDeParcelas }}</span>
+                  }
+                </span>
+                <span class="valor">{{ moeda(conta.valor) }}</span>
+              </span>
+              <span class="item-info">
+                <span>Vence {{ data(conta.vencimento) }}</span>
+                <span>{{ conta.categoria }}</span>
+                @if (conta.fornecedor) {
+                  <span>{{ conta.fornecedor.razaoSocial }}</span>
+                }
+              </span>
+            </button>
+          </li>
+        } @empty {
+          <li class="estado">Nenhuma conta lançada.</li>
+        }
+      </ul>
+    }
+  </mat-card>
+
+  @if (selecionada()) {
+    <mat-card appearance="outlined" class="editor">
+      <h2>{{ nova() ? 'Lançar conta' : atual()?.descricao }}</h2>
+
+      @if (!nova() && atual(); as conta) {
+        <p class="situacao" data-parcela>Parcela {{ conta.parcela }}/{{ conta.totalDeParcelas }}</p>
+      }
+
+      <form [formGroup]="formulario" (ngSubmit)="salvar()" novalidate class="campos">
+        <mat-form-field appearance="outline" class="largo">
+          <mat-label>Descrição</mat-label>
+          <input
+            matInput
+            data-campo="descricao"
+            formControlName="descricao"
+            maxlength="150"
+            autocomplete="off"
+          />
+          @if (formulario.controls.descricao.invalid) {
+            <mat-error>Informe a descrição</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Categoria</mat-label>
+          <select matNativeControl data-campo="categoria" formControlName="categoriaId">
+            <option value="" disabled></option>
+            @for (categoria of opcoesDeCategoria(); track categoria.id) {
+              <option [value]="categoria.id">{{ categoria.nome }}</option>
+            }
+          </select>
+          @if (formulario.controls.categoriaId.invalid) {
+            <mat-error>Informe a categoria</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ nova() ? 'Valor total (R$)' : 'Valor (R$)' }}</mat-label>
+          <input
+            matInput
+            inputmode="decimal"
+            data-campo="valor"
+            formControlName="valor"
+            autocomplete="off"
+          />
+          @if (formulario.controls.valor.hasError('positivo')) {
+            <mat-error>O valor precisa ser maior que zero</mat-error>
+          } @else if (formulario.controls.valor.hasError('formato')) {
+            <mat-error>Use um valor como 1.000,00</mat-error>
+          } @else if (formulario.controls.valor.hasError('required')) {
+            <mat-error>Informe o valor</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>{{ nova() ? 'Primeiro vencimento' : 'Vencimento' }}</mat-label>
+          <input matInput type="date" data-campo="vencimento" formControlName="vencimento" />
+          @if (formulario.controls.vencimento.invalid) {
+            <mat-error>Informe o vencimento</mat-error>
+          }
+        </mat-form-field>
+
+        @if (nova()) {
+          <mat-form-field appearance="outline">
+            <mat-label>Parcelas</mat-label>
+            <input
+              matInput
+              type="number"
+              min="1"
+              [max]="parcelasMaximo"
+              data-campo="parcelas"
+              formControlName="parcelas"
+            />
+            @if (formulario.controls.parcelas.invalid) {
+              <mat-error>Informe de 1 a {{ parcelasMaximo }} parcelas</mat-error>
+            }
+          </mat-form-field>
+        }
+
+        <mat-form-field appearance="outline">
+          <mat-label>Fornecedor (opcional)</mat-label>
+          @if (escolheFornecedor()) {
+            <select matNativeControl data-campo="fornecedor" formControlName="fornecedor">
+              <option value="">Sem fornecedor</option>
+              @for (fornecedor of opcoesDeFornecedor(); track fornecedor.documento) {
+                <option [value]="fornecedor.documento">{{ fornecedor.nome }}</option>
+              }
+            </select>
+          } @else {
+            <input
+              matInput
+              data-campo="fornecedor"
+              formControlName="fornecedor"
+              placeholder="CNPJ ou CPF do fornecedor"
+              autocomplete="off"
+            />
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Número do documento (opcional)</mat-label>
+          <input
+            matInput
+            data-campo="numeroDocumento"
+            formControlName="numeroDocumento"
+            maxlength="60"
+            autocomplete="off"
+          />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="largo">
+          <mat-label>Observação (opcional)</mat-label>
+          <textarea
+            matInput
+            data-campo="observacao"
+            formControlName="observacao"
+            maxlength="1000"
+            rows="2"
+          ></textarea>
+        </mat-form-field>
+
+        @if (nova() && previa().length > 0) {
+          <table class="previa largo" data-previa aria-label="Prévia das parcelas">
+            <thead>
+              <tr>
+                <th scope="col">Parcela</th>
+                <th scope="col">Valor</th>
+                <th scope="col">Vencimento</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (parcela of previa(); track parcela.numero) {
+                <tr>
+                  <td>{{ parcela.numero }}/{{ parcela.total }}</td>
+                  <td>{{ moeda(parcela.valor) }}</td>
+                  <td>{{ data(parcela.vencimento) }}</td>
+                </tr>
+              }
+            </tbody>
+            <tfoot>
+              <tr>
+                <th scope="row">Total</th>
+                <td>{{ moeda(totalDaPrevia()) }}</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        }
+
+        @if (erro()) {
+          <p class="erro" role="alert">{{ erro() }}</p>
+        }
+        @if (aviso()) {
+          <p class="aviso" role="status">{{ aviso() }}</p>
+        }
+
+        @if (podeEditar()) {
+          <div class="acoes">
+            @if (!nova() && atual()) {
+              <button
+                mat-button
+                type="button"
+                class="perigo"
+                data-acao="excluir"
+                [disabled]="salvando()"
+                (click)="excluir()"
+              >
+                <mat-icon>delete</mat-icon>
+                {{ confirmandoExclusao() ? 'Confirmar exclusão' : 'Excluir' }}
+              </button>
+            }
+            <span class="espaco"></span>
+            <button mat-flat-button type="submit" data-acao="salvar" [disabled]="salvando()">
+              {{ nova() ? 'Lançar' : 'Salvar' }}
+            </button>
+          </div>
+        }
+      </form>
+    </mat-card>
+  }
+</div>
