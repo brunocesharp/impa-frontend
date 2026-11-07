@@ -1,0 +1,118 @@
+<div class="topo">
+  <a mat-button routerLink="/configuracao">
+    <mat-icon>arrow_back</mat-icon>
+    Configuração
+  </a>
+</div>
+
+@if (carregando()) {
+  <p class="estado">Carregando perfis…</p>
+} @else {
+  <div class="layout">
+    <mat-card appearance="outlined" class="lista">
+      <div class="lista-cabecalho">
+        <h2>Perfis</h2>
+        <button mat-flat-button type="button" (click)="criarNovo()">
+          <mat-icon>add</mat-icon>
+          Novo perfil
+        </button>
+      </div>
+
+      <ul role="list">
+        @for (perfil of perfis(); track perfil.id) {
+          <li>
+            <button
+              type="button"
+              class="item"
+              data-perfil
+              [class.ativo]="perfil.id === selecionado()"
+              [attr.aria-current]="perfil.id === selecionado() ? 'true' : null"
+              (click)="selecionar(perfil)"
+            >
+              <span class="item-nome">{{ perfil.nome }}</span>
+              <span class="item-info">
+                @if (perfil.protegido) {
+                  <span class="selo"><mat-icon aria-hidden="true">lock</mat-icon>Protegido</span>
+                }
+                {{ perfil.usuarios }} {{ perfil.usuarios === 1 ? 'usuário' : 'usuários' }}
+              </span>
+            </button>
+          </li>
+        }
+      </ul>
+    </mat-card>
+
+    @if (selecionado()) {
+      <mat-card appearance="outlined" class="editor">
+        <h2>{{ novo() ? 'Novo perfil' : atual()?.nome }}</h2>
+
+        @if (protegido()) {
+          <p class="protegido">
+            <mat-icon aria-hidden="true">lock</mat-icon>
+            O perfil Administrador tem todas as permissões e não pode ser alterado nem excluído.
+          </p>
+        }
+
+        <mat-form-field appearance="outline" class="campo-nome">
+          <mat-label>Nome do perfil</mat-label>
+          <input
+            matInput
+            data-campo="nome"
+            [formControl]="nome"
+            maxlength="60"
+            autocomplete="off"
+          />
+          @if (nome.hasError('required')) {
+            <mat-error>Informe o nome do perfil</mat-error>
+          }
+        </mat-form-field>
+
+        <div class="grupos">
+          @for (grupo of grupos(); track grupo.nome) {
+            <fieldset data-grupo>
+              <h3>{{ grupo.nome }}</h3>
+              @for (permissao of grupo.permissoes; track permissao.codigo) {
+                <mat-checkbox
+                  data-permissao
+                  [checked]="marcadas().has(permissao.codigo)"
+                  [disabled]="protegido() || salvando()"
+                  (change)="alternar(permissao.codigo, $event.checked)"
+                >
+                  {{ permissao.descricao }}
+                </mat-checkbox>
+              }
+            </fieldset>
+          }
+        </div>
+
+        @if (erro()) {
+          <p class="erro" role="alert">{{ erro() }}</p>
+        }
+        @if (aviso()) {
+          <p class="aviso" role="status">{{ aviso() }}</p>
+        }
+
+        @if (!protegido()) {
+          <div class="acoes">
+            @if (!novo()) {
+              <button
+                mat-button
+                type="button"
+                class="excluir"
+                [disabled]="salvando()"
+                (click)="excluir()"
+              >
+                <mat-icon>delete</mat-icon>
+                {{ confirmandoExclusao() ? 'Confirmar exclusão' : 'Excluir' }}
+              </button>
+            }
+            <span class="espaco"></span>
+            <button mat-flat-button type="button" [disabled]="salvando()" (click)="salvar()">
+              Salvar
+            </button>
+          </div>
+        }
+      </mat-card>
+    }
+  </div>
+}
