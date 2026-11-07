@@ -1,9 +1,13 @@
 import { Routes } from '@angular/router';
 import { autenticadoGuard, permissaoGuard, trocaDeSenhaGuard } from './core/auth/auth.guard';
 import { MENU } from './core/menu/menu';
+import { terminalGuard } from './core/terminal/terminal.guard';
 
 /** Itens do menu que já têm tela própria (os demais levam a "Em construção"). */
 const COM_TELA = new Set(['configuracao', 'pessoas', 'contas']);
+
+/** PDV e caixa: só num dispositivo registrado como terminal (story 1-6, RN-11.1). */
+export const ROTAS_DE_TERMINAL: ReadonlySet<string> = new Set(['vendas', 'caixa']);
 
 export const routes: Routes = [
   {
@@ -84,6 +88,23 @@ export const routes: Routes = [
         ],
       },
       {
+        path: 'configuracao/terminais',
+        title: 'Terminais · IMPA',
+        canActivate: [permissaoGuard],
+        data: { titulo: 'Terminais', permissao: 'terminais.gerenciar' },
+        loadComponent: () =>
+          import('./features/configuracao/terminais/terminais').then((m) => m.Terminais),
+      },
+      {
+        path: 'terminal-nao-registrado',
+        title: 'Terminal não registrado · IMPA',
+        data: { titulo: 'Terminal não registrado' },
+        loadComponent: () =>
+          import('./features/terminal-nao-registrado/terminal-nao-registrado').then(
+            (m) => m.TerminalNaoRegistrado,
+          ),
+      },
+      {
         // Story 11-1: contas a pagar e categorias financeiras, em abas.
         path: 'contas',
         canActivate: [permissaoGuard],
@@ -111,7 +132,7 @@ export const routes: Routes = [
       ...MENU.filter((item) => item.rota !== '' && !COM_TELA.has(item.rota)).map((item) => ({
         path: item.rota,
         title: `${item.rotulo} · IMPA`,
-        canActivate: [permissaoGuard],
+        canActivate: ROTAS_DE_TERMINAL.has(item.rota) ? [permissaoGuard, terminalGuard] : [permissaoGuard],
         data: { titulo: item.rotulo, permissao: item.permissao },
         loadComponent: () =>
           import('./features/em-construcao/em-construcao').then((m) => m.EmConstrucao),

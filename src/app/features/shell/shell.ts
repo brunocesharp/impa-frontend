@@ -1,5 +1,5 @@
 import { BreakpointObserver } from '@angular/cdk/layout';
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -11,18 +11,23 @@ import { ActivatedRoute, NavigationEnd, Router, RouterLink, RouterLinkActive, Ro
 import { filter, map } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { itensVisiveis } from '../../core/menu/menu';
+import { NotificacoesService } from '../../core/notificacoes/notificacoes.service';
 import { PreferenciaTema, TemaService } from '../../core/tema/tema.service';
 import { VersaoService } from '../../core/versao/versao.service';
+import { SinoNotificacoes } from './sino-notificacoes';
+
+/** Permissão que mostra o sino (story 4-2). */
+export const PERMISSAO_NOTIFICACOES = 'notificacoes.receber';
 
 /**
- * Shell da retaguarda: menu lateral (gaveta no celular), barra superior de 56 px com título, usuário,
- * tema e sair. Os itens do menu vêm das permissões de /api/auth/me.
+ * Shell da retaguarda: menu lateral (gaveta no celular), barra superior de 56 px com título, sino de notificações
+ * (só com `notificacoes.receber`, story 4-2), usuário, tema e sair. Os itens do menu vêm das permissões de /api/auth/me.
  */
 @Component({
   selector: 'app-shell',
   imports: [
     RouterOutlet, RouterLink, RouterLinkActive,
-    MatSidenavModule, MatToolbarModule, MatButtonModule, MatIconModule, MatMenuModule,
+    MatSidenavModule, MatToolbarModule, MatButtonModule, MatIconModule, MatMenuModule, SinoNotificacoes,
   ],
   templateUrl: './shell.html',
   styleUrl: './shell.scss',
@@ -38,6 +43,8 @@ export class Shell {
 
   protected readonly sessao = this.auth.sessao;
   protected readonly itens = computed(() => itensVisiveis(this.auth.permissoes()));
+  /** RN-2.3: só quem tem a permissão de receber vê o sino (o servidor também exige, 403). */
+  protected readonly recebeNotificacoes = computed(() => this.auth.permissoes().has(PERMISSAO_NOTIFICACOES));
 
   protected readonly celular = toSignal(
     inject(BreakpointObserver).observe('(max-width: 840px)').pipe(map((r) => r.matches)),
@@ -60,6 +67,11 @@ export class Shell {
 
   constructor() {
     void this.versao.carregarApi();
+
+    // Contador por consulta periódica enquanto o shell estiver aberto e o usuário tiver a permissão.
+    const notificacoes = inject(NotificacoesService);
+    effect(() => (this.recebeNotificacoes() ? notificacoes.iniciar() : notificacoes.parar()));
+    inject(DestroyRef).onDestroy(() => notificacoes.parar());
   }
 
   protected async sair(): Promise<void> {
