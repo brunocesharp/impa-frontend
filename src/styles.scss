@@ -38,6 +38,12 @@ h2,
   box-shadow: none;
 }
 
+// Painel do sino de notificações (story 4-2): mais largo que o menu padrão de 280 px.
+.painel-notificacoes.mat-mdc-menu-panel {
+  width: min(360px, calc(100vw - 32px));
+  max-width: min(360px, calc(100vw - 32px));
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
