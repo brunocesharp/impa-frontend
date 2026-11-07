@@ -4,7 +4,7 @@ import { MENU } from './core/menu/menu';
 import { terminalGuard } from './core/terminal/terminal.guard';
 
 /** Itens do menu que já têm tela própria (os demais levam a "Em construção"). */
-const COM_TELA = new Set(['configuracao']);
+const COM_TELA = new Set(['configuracao', 'pessoas']);
 
 /** PDV e caixa: só num dispositivo registrado como terminal (story 1-6, RN-11.1). */
 export const ROTAS_DE_TERMINAL: ReadonlySet<string> = new Set(['vendas', 'caixa']);
@@ -59,7 +59,33 @@ export const routes: Routes = [
         title: 'Usuários · IMPA',
         canActivate: [permissaoGuard],
         data: { titulo: 'Usuários', permissao: 'usuarios.gerenciar' },
-        loadComponent: () => import('./features/configuracao/usuarios/usuarios').then((m) => m.Usuarios),
+        loadComponent: () =>
+          import('./features/configuracao/usuarios/usuarios').then((m) => m.Usuarios),
+      },
+      {
+        // Story 3-7: abas Clientes e Fornecedores (decisão de 07/11/2026).
+        path: 'pessoas',
+        canActivate: [permissaoGuard],
+        data: { titulo: 'Pessoas', permissao: 'clientes.ver' },
+        loadComponent: () => import('./features/pessoas/pessoas').then((m) => m.Pessoas),
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: 'clientes' },
+          {
+            path: 'clientes',
+            title: 'Clientes · IMPA',
+            data: { titulo: 'Clientes' },
+            loadComponent: () =>
+              import('./features/pessoas/clientes/clientes').then((m) => m.Clientes),
+          },
+          {
+            path: 'fornecedores',
+            title: 'Fornecedores · IMPA',
+            canActivate: [permissaoGuard],
+            data: { titulo: 'Fornecedores', permissao: 'fornecedores.gerenciar' },
+            loadComponent: () =>
+              import('./features/pessoas/fornecedores/fornecedores').then((m) => m.Fornecedores),
+          },
+        ],
       },
       {
         path: 'configuracao/terminais',
