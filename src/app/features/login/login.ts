@@ -19,7 +19,7 @@ import { CenaEspacial } from './cena-espacial';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Login {
-  private readonly auth = inject(AuthService);
+  protected readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   protected readonly tema = inject(TemaService);
 

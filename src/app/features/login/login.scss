@@ -55,6 +55,26 @@ form {
   }
 }
 
+// Sessão encerrada no servidor: informação, não erro (story 1-2).
+.aviso {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 360px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface);
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    color: var(--mat-sys-primary);
+  }
+}
+
 button[type='submit'] {
   height: 44px;
   margin-top: 8px;

@@ -44,7 +44,53 @@ describe('sessaoExpiradaInterceptor', () => {
     expect(TestBed.inject(AuthService).sessao()).toBeNull();
   });
 
-  it('401 em /api/auth/* é tratado pela própria tela: não navega', async () => {
+  it('401 com a sessão aberta (revogada ou vencida nas 12 h) deixa o aviso "Sua sessão foi encerrada"', async () => {
+    await responder('/api/configuracao/empresa', 401, 'Unauthorized');
+
+    expect(TestBed.inject(AuthService).aviso()).toBe('Sua sessão foi encerrada');
+  });
+
+  it('401 do /api/auth/me com a sessão aberta também encerra, com o aviso', async () => {
+    await responder('/api/auth/me', 401, 'Unauthorized');
+
+    expect(navegar).toHaveBeenCalledWith('/login');
+    expect(TestBed.inject(AuthService).aviso()).toBe('Sua sessão foi encerrada');
+  });
+
+  it('R1: dois 401 simultâneos depois da revogação mantêm o aviso "Sua sessão foi encerrada"', async () => {
+    const primeira = firstValueFrom(cliente.get('/api/configuracao/empresa'));
+    const segunda = firstValueFrom(cliente.get('/api/outra'));
+    http.expectOne('/api/configuracao/empresa').flush(null, { status: 401, statusText: 'Unauthorized' });
+    http.expectOne('/api/outra').flush(null, { status: 401, statusText: 'Unauthorized' });
+    await expect(primeira).rejects.toMatchObject({ status: 401 });
+    await expect(segunda).rejects.toMatchObject({ status: 401 });
+
+    expect(TestBed.inject(AuthService).aviso()).toBe('Sua sessão foi encerrada');
+  });
+
+  it('401 sem sessão aberta não deixa aviso', async () => {
+    TestBed.inject(AuthService).encerrarLocalmente();
+
+    await responder('/api/configuracao/empresa', 401, 'Unauthorized');
+
+    expect(navegar).toHaveBeenCalledWith('/login');
+    expect(TestBed.inject(AuthService).aviso()).toBeNull();
+  });
+
+  for (const url of ['/api/auth/login', '/api/auth/logout']) {
+    it(`401 em ${url} é tratado pela própria tela: não navega`, async () => {
+      const chamada = firstValueFrom(cliente.post(url, null));
+      http.expectOne(url).flush(null, { status: 401, statusText: 'Unauthorized' });
+      await expect(chamada).rejects.toMatchObject({ status: 401 });
+
+      expect(navegar).not.toHaveBeenCalled();
+      expect(TestBed.inject(AuthService).aviso()).toBeNull();
+    });
+  }
+
+  it('401 do /api/auth/me sem sessão aberta (abrir o app) não navega', async () => {
+    TestBed.inject(AuthService).encerrarLocalmente();
+
     await responder('/api/auth/me', 401, 'Unauthorized');
 
     expect(navegar).not.toHaveBeenCalled();
