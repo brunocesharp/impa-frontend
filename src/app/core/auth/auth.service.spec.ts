@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { AuthService } from './auth.service';
-import { MENSAGEM_CREDENCIAL_INVALIDA } from './sessao';
+import { MENSAGEM_CREDENCIAL_INVALIDA, MENSAGEM_MUITAS_TENTATIVAS } from './sessao';
 
 describe('AuthService', () => {
   let auth: AuthService;
@@ -78,6 +78,22 @@ describe('AuthService', () => {
       http.expectOne('/api/auth/login').flush(null, { status: 401, statusText: 'Unauthorized' });
 
       expect(await entrando).toEqual({ ok: false, mensagem: MENSAGEM_CREDENCIAL_INVALIDA });
+    });
+
+    it('429 (limite de tentativas) usa a mensagem do servidor', async () => {
+      const entrando = auth.entrar('ana', 'errada123');
+      http
+        .expectOne('/api/auth/login')
+        .flush({ mensagem: 'Mensagem do limite' }, { status: 429, statusText: 'Too Many Requests', headers: { 'Retry-After': '10' } });
+
+      expect(await entrando).toEqual({ ok: false, mensagem: 'Mensagem do limite' });
+    });
+
+    it('429 sem mensagem usa o texto padrão do limite', async () => {
+      const entrando = auth.entrar('ana', 'errada123');
+      http.expectOne('/api/auth/login').flush(null, { status: 429, statusText: 'Too Many Requests' });
+
+      expect(await entrando).toEqual({ ok: false, mensagem: MENSAGEM_MUITAS_TENTATIVAS });
     });
 
     it('400 de validação devolve a mensagem de cada campo', async () => {

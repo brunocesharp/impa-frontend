@@ -152,6 +152,41 @@ describe('Login', () => {
     });
   });
 
+  it('429 do limite de tentativas mostra a mensagem do servidor e limpa a senha', async () => {
+    const fixture = await abrirTela();
+    const elemento = fixture.nativeElement as HTMLElement;
+
+    preencherEEntrar(elemento, 'ana', 'balcao2026');
+    (await requisicao('/api/auth/login')).flush(
+      { mensagem: 'Muitas tentativas de entrar. Aguarde um minuto e tente novamente' },
+      { status: 429, statusText: 'Too Many Requests', headers: { 'Retry-After': '10' } },
+    );
+
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(elemento.querySelector('[role="alert"]')?.textContent).toContain(
+        'Muitas tentativas de entrar. Aguarde um minuto e tente novamente',
+      );
+    });
+    expect(elemento.textContent).not.toContain('Não foi possível falar com o servidor');
+    expect(elemento.querySelector<HTMLInputElement>('input[formControlName="senha"]')!.value).toBe('');
+  });
+
+  it('429 sem mensagem usa o texto padrão do limite', async () => {
+    const fixture = await abrirTela();
+    const elemento = fixture.nativeElement as HTMLElement;
+
+    preencherEEntrar(elemento, 'ana', 'balcao2026');
+    (await requisicao('/api/auth/login')).flush(null, { status: 429, statusText: 'Too Many Requests' });
+
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      expect(elemento.querySelector('[role="alert"]')?.textContent).toContain(
+        'Muitas tentativas de entrar. Aguarde um minuto e tente novamente',
+      );
+    });
+  });
+
   it('sessão encerrada no servidor: a tela mostra "Sua sessão foi encerrada" até a próxima tentativa', async () => {
     const fixture = criarTela();
     TestBed.inject(AuthService).encerrarLocalmente('Sua sessão foi encerrada');
