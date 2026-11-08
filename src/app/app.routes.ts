@@ -4,7 +4,7 @@ import { MENU } from './core/menu/menu';
 import { terminalGuard } from './core/terminal/terminal.guard';
 
 /** Itens do menu que já têm tela própria (os demais levam a "Em construção"). */
-const COM_TELA = new Set(['configuracao', 'pessoas']);
+const COM_TELA = new Set(['configuracao', 'pessoas', 'contas']);
 
 /** PDV e caixa: só num dispositivo registrado como terminal (story 1-6, RN-11.1). */
 export const ROTAS_DE_TERMINAL: ReadonlySet<string> = new Set(['vendas', 'caixa']);
@@ -103,6 +103,30 @@ export const routes: Routes = [
           import('./features/terminal-nao-registrado/terminal-nao-registrado').then(
             (m) => m.TerminalNaoRegistrado,
           ),
+      },
+      {
+        // Story 11-1: contas a pagar e categorias financeiras, em abas.
+        path: 'contas',
+        canActivate: [permissaoGuard],
+        data: { titulo: 'Contas', permissao: 'financeiro.ver' },
+        loadComponent: () => import('./features/financeiro/financeiro').then((m) => m.Financeiro),
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: 'a-pagar' },
+          {
+            path: 'a-pagar',
+            title: 'Contas a pagar · IMPA',
+            data: { titulo: 'Contas a pagar' },
+            loadComponent: () =>
+              import('./features/financeiro/contas/contas').then((m) => m.Contas),
+          },
+          {
+            path: 'categorias',
+            title: 'Categorias financeiras · IMPA',
+            data: { titulo: 'Categorias financeiras' },
+            loadComponent: () =>
+              import('./features/financeiro/categorias/categorias').then((m) => m.Categorias),
+          },
+        ],
       },
       // Telas ainda não construídas: cada item do menu leva a "Em construção".
       ...MENU.filter((item) => item.rota !== '' && !COM_TELA.has(item.rota)).map((item) => ({
