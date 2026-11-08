@@ -46,6 +46,14 @@
                 @if (conta.fornecedor) {
                   <span>{{ conta.fornecedor.razaoSocial }}</span>
                 }
+                @if (conta.situacaoDoPagamento !== 'sem-pagamento') {
+                  <span class="selo" [attr.data-selo]="conta.situacaoDoPagamento">
+                    {{ situacao(conta.situacaoDoPagamento) }}
+                    @if (conta.saldo > 0) {
+                      · saldo {{ moeda(conta.saldo) }}
+                    }
+                  </span>
+                }
               </span>
             </button>
           </li>
@@ -62,6 +70,14 @@
 
       @if (!nova() && atual(); as conta) {
         <p class="situacao" data-parcela>Parcela {{ conta.parcela }}/{{ conta.totalDeParcelas }}</p>
+        <p class="situacao" data-pagamento>
+          {{ situacao(conta.situacaoDoPagamento) }} · saldo {{ moeda(conta.saldo) }}
+        </p>
+        @if (comPagamento()) {
+          <p class="situacao" data-travada>
+            Conta com pagamento: só a descrição e a observação podem ser alteradas.
+          </p>
+        }
       }
 
       <form [formGroup]="formulario" (ngSubmit)="salvar()" novalidate class="campos">
@@ -158,7 +174,7 @@
           }
         </mat-form-field>
 
-        @if (escolheFornecedor() && podeEditar()) {
+        @if (escolheFornecedor() && podeEditar() && !comPagamento()) {
           <mat-form-field appearance="outline">
             <mat-label>Buscar fornecedor</mat-label>
             <input
@@ -232,7 +248,7 @@
 
         @if (podeEditar()) {
           <div class="acoes">
-            @if (!nova() && atual()) {
+            @if (!nova() && atual() && !comPagamento()) {
               <button
                 mat-button
                 type="button"
@@ -252,6 +268,169 @@
           </div>
         }
       </form>
+
+      @if (!nova() && atual(); as conta) {
+        <section class="pagamentos" data-pagamentos aria-label="Pagamentos">
+          <div class="pagamentos-cabecalho">
+            <h3>Pagamentos</h3>
+            @if (podeEditar() && conta.saldo > 0 && !pagando()) {
+              <button
+                mat-stroked-button
+                type="button"
+                data-acao="pagar"
+                [disabled]="salvando()"
+                (click)="abrirPagamento()"
+              >
+                <mat-icon>payments</mat-icon>
+                Pagar
+              </button>
+            }
+          </div>
+
+          @if (pagando()) {
+            <form
+              [formGroup]="pagamento"
+              (ngSubmit)="pagar()"
+              novalidate
+              class="campos"
+              data-form-pagamento
+            >
+              <mat-form-field appearance="outline">
+                <mat-label>Data do pagamento</mat-label>
+                <input matInput type="date" data-campo="dataPagamento" formControlName="data" />
+                @if (pagamento.controls.data.invalid) {
+                  <mat-error>Informe a data do pagamento</mat-error>
+                }
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Valor pago (R$)</mat-label>
+                <input
+                  matInput
+                  inputmode="decimal"
+                  data-campo="valorPago"
+                  formControlName="valor"
+                  autocomplete="off"
+                />
+                <mat-hint>Saldo: {{ moeda(conta.saldo) }}</mat-hint>
+                @if (pagamento.controls.valor.hasError('positivo')) {
+                  <mat-error>O valor precisa ser maior que zero</mat-error>
+                } @else if (pagamento.controls.valor.hasError('formato')) {
+                  <mat-error>Use um valor como 1.000,00</mat-error>
+                } @else if (pagamento.controls.valor.hasError('required')) {
+                  <mat-error>Informe o valor</mat-error>
+                }
+              </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>Forma de pagamento</mat-label>
+                <select matNativeControl data-campo="forma" formControlName="formaDePagamentoId">
+                  <option value="" disabled></option>
+                  @for (forma of formas(); track forma.id) {
+                    <option [value]="forma.id">{{ forma.nome }}</option>
+                  }
+                </select>
+                @if (pagamento.controls.formaDePagamentoId.invalid) {
+                  <mat-error>Informe a forma de pagamento</mat-error>
+                }
+              </mat-form-field>
+
+              <div class="acoes">
+                <span class="espaco"></span>
+                <button
+                  mat-button
+                  type="button"
+                  data-acao="cancelar-pagamento"
+                  (click)="cancelarPagamento()"
+                >
+                  Cancelar
+                </button>
+                <button
+                  mat-flat-button
+                  type="submit"
+                  data-acao="confirmar-pagamento"
+                  [disabled]="salvando()"
+                >
+                  Registrar pagamento
+                </button>
+              </div>
+            </form>
+          }
+
+          <ul role="list" class="baixas">
+            @for (baixa of conta.baixas; track baixa.id) {
+              <li data-baixa [class.estornada]="baixa.estornada">
+                <span class="baixa-linha">
+                  <span
+                    ><span data-baixa-data>{{ data(baixa.data) }}</span> ·
+                    <span data-baixa-forma>{{ baixa.formaDePagamento }}</span></span
+                  >
+                  <span class="valor" data-baixa-valor>{{ moeda(baixa.valor) }}</span>
+                </span>
+                @if (baixa.estornada) {
+                  <span class="item-info" data-estorno>
+                    Estornado em {{ baixa.estornadaEm | date: 'dd/MM/yyyy HH:mm' }} por
+                    {{ baixa.estornadaPor }}: {{ baixa.motivoDoEstorno }}
+                  </span>
+                } @else if (podeEditar()) {
+                  @if (estornando() === baixa.id) {
+                    <div class="estorno">
+                      <mat-form-field appearance="outline" class="largo">
+                        <mat-label>Motivo do estorno</mat-label>
+                        <input
+                          matInput
+                          data-campo="motivo"
+                          [formControl]="motivo"
+                          maxlength="500"
+                          autocomplete="off"
+                        />
+                        @if (motivo.invalid) {
+                          <mat-error>Informe o motivo do estorno</mat-error>
+                        }
+                      </mat-form-field>
+                      <div class="acoes">
+                        <span class="espaco"></span>
+                        <button
+                          mat-button
+                          type="button"
+                          data-acao="cancelar-estorno"
+                          (click)="cancelarEstorno()"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          mat-flat-button
+                          type="button"
+                          class="perigo"
+                          data-acao="confirmar-estorno"
+                          [disabled]="salvando()"
+                          (click)="estornar()"
+                        >
+                          Estornar
+                        </button>
+                      </div>
+                    </div>
+                  } @else {
+                    <button
+                      mat-button
+                      type="button"
+                      class="perigo"
+                      data-acao="estornar"
+                      [disabled]="salvando()"
+                      (click)="abrirEstorno(baixa)"
+                    >
+                      <mat-icon>undo</mat-icon>
+                      Estornar
+                    </button>
+                  }
+                }
+              </li>
+            } @empty {
+              <li class="estado">Nenhum pagamento registrado.</li>
+            }
+          </ul>
+        </section>
+      }
     </mat-card>
   }
 </div>

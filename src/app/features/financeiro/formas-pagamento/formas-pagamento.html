@@ -1,0 +1,129 @@
+<div class="layout">
+  <mat-card appearance="outlined" class="lista">
+    <div class="lista-cabecalho">
+      <h2>Formas de pagamento</h2>
+      @if (podeEditar()) {
+        <button mat-flat-button type="button" data-acao="novo" (click)="criarNova()">
+          <mat-icon>add</mat-icon>
+          Nova forma de pagamento
+        </button>
+      }
+    </div>
+
+    <div class="busca">
+      <mat-checkbox data-campo="inativas" [formControl]="incluirInativas" (change)="carregar()"
+        >Mostrar inativas</mat-checkbox
+      >
+    </div>
+
+    @if (!selecionada() && aviso()) {
+      <p class="aviso" role="status">{{ aviso() }}</p>
+    }
+    @if (!selecionada() && erro()) {
+      <p class="erro" role="alert">{{ erro() }}</p>
+    }
+
+    @if (carregando()) {
+      <p class="estado">Carregando formas de pagamento…</p>
+    } @else {
+      <ul role="list">
+        @for (forma of formas(); track forma.id) {
+          <li>
+            <button
+              type="button"
+              class="item"
+              data-forma
+              [class.ativo]="forma.id === selecionada()"
+              [class.inativo]="!forma.ativa"
+              [attr.aria-current]="forma.id === selecionada() ? 'true' : null"
+              (click)="selecionar(forma)"
+            >
+              <span class="item-nome">{{ forma.nome }}</span>
+              @if (!forma.ativa) {
+                <span class="item-info"
+                  ><span class="selo" data-selo="inativa"
+                    ><mat-icon aria-hidden="true">block</mat-icon>Inativa</span
+                  ></span
+                >
+              }
+            </button>
+          </li>
+        } @empty {
+          <li class="estado">Nenhuma forma de pagamento cadastrada.</li>
+        }
+      </ul>
+    }
+  </mat-card>
+
+  @if (selecionada()) {
+    <mat-card appearance="outlined" class="editor">
+      <h2>{{ nova() ? 'Nova forma de pagamento' : atual()?.nome }}</h2>
+
+      @if (!nova() && atual(); as forma) {
+        <p class="situacao" data-situacao>{{ forma.ativa ? 'Ativa' : 'Inativa' }}</p>
+      }
+
+      <form (submit)="$event.preventDefault(); salvar()" novalidate class="campos">
+        <mat-form-field appearance="outline" class="largo">
+          <mat-label>Nome</mat-label>
+          <input
+            matInput
+            data-campo="nome"
+            [formControl]="nome"
+            maxlength="60"
+            autocomplete="off"
+          />
+          @if (nome.hasError('required')) {
+            <mat-error>Informe o nome da forma de pagamento</mat-error>
+          }
+        </mat-form-field>
+
+        @if (erro()) {
+          <p class="erro" role="alert">{{ erro() }}</p>
+        }
+        @if (aviso()) {
+          <p class="aviso" role="status">{{ aviso() }}</p>
+        }
+
+        @if (podeEditar()) {
+          <div class="acoes">
+            @if (!nova() && atual(); as forma) {
+              <button
+                mat-button
+                type="button"
+                data-acao="situacao"
+                [class.perigo]="forma.ativa"
+                [disabled]="salvando()"
+                (click)="alternarSituacao()"
+              >
+                <mat-icon>{{ forma.ativa ? 'block' : 'check_circle' }}</mat-icon>
+                {{
+                  forma.ativa
+                    ? confirmando() === 'inativar'
+                      ? 'Confirmar inativação'
+                      : 'Inativar'
+                    : 'Reativar'
+                }}
+              </button>
+              <button
+                mat-button
+                type="button"
+                class="perigo"
+                data-acao="excluir"
+                [disabled]="salvando()"
+                (click)="excluir()"
+              >
+                <mat-icon>delete</mat-icon>
+                {{ confirmando() === 'excluir' ? 'Confirmar exclusão' : 'Excluir' }}
+              </button>
+            }
+            <span class="espaco"></span>
+            <button mat-flat-button type="submit" data-acao="salvar" [disabled]="salvando()">
+              {{ nova() ? 'Cadastrar forma' : 'Salvar' }}
+            </button>
+          </div>
+        }
+      </form>
+    </mat-card>
+  }
+</div>
