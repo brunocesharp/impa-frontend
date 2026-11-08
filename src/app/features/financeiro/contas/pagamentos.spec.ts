@@ -101,20 +101,27 @@ describe('Pagar e estornar (story 11-2)', () => {
     await esperar(fixture);
   }
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    vi.useRealTimers();
+  });
+
+  const parte = (el: Element | null, nome: string) => texto(el?.querySelector(`[${nome}]`) ?? null);
 
   it('cenário 23.2: "Pagar" sugere o saldo, registra R$ 200,00 via Pix e a conta fica parcialmente paga', async () => {
+    // Relógio fixo em 05/11/2026, 23:30 (hora local): a data padrão é a de hoje no fuso da loja.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 5, 23, 30));
     const { fixture, el } = await abrir([conta(500)]);
     expect(texto(el.querySelector('[data-pagamento]'))).toBe('Sem pagamento · saldo R$ 500,00');
 
     await abrirPagamento(fixture, el);
     expect(campo(el, 'valorPago')!.value).toBe('500,00');
-    expect(campo(el, 'dataPagamento')!.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(campo(el, 'dataPagamento')!.value).toBe('2026-11-05');
     expect(
       Array.from(campo<HTMLSelectElement>(el, 'forma')!.options).map((o) => o.textContent!.trim()),
     ).toEqual(['', 'Boleto', 'Pix']);
 
-    preencher(el, 'dataPagamento', '2026-11-05');
     preencher(el, 'valorPago', '200,00');
     preencher(el, 'forma', PIX.id);
     botao(el, 'confirmar-pagamento')!.click();
@@ -132,10 +139,150 @@ describe('Pagar e estornar (story 11-2)', () => {
 
     expect(texto(el.querySelector('[data-pagamento]'))).toBe('Parcialmente paga · saldo R$ 300,00');
     expect(el.textContent).toContain('Pagamento registrado');
-    expect(texto(el.querySelector('[data-baixa] .baixa-linha'))).toBe('05/11/2026 · PixR$ 200,00');
+    const linha = el.querySelector('[data-baixa]');
+    expect([
+      parte(linha, 'data-baixa-data'),
+      parte(linha, 'data-baixa-forma'),
+      parte(linha, 'data-baixa-valor'),
+    ]).toEqual(['05/11/2026', 'Pix', 'R$ 200,00']);
     expect(texto(el.querySelector('[data-conta]'))).toContain(
       'Parcialmente paga · saldo R$ 300,00',
     );
+  });
+
+  it('cenário 23.2: paga R$ 500,00 via Pix e a conta fica "paga", sem "Pagar"', async () => {
+    const { fixture, el } = await abrir([conta(500)]);
+    await abrirPagamento(fixture, el);
+    preencher(el, 'dataPagamento', '2026-11-05');
+    preencher(el, 'forma', PIX.id);
+    botao(el, 'confirmar-pagamento')!.click();
+
+    const pedido = http.expectOne(
+      (r) => r.url === '/api/financeiro/contas/k1/baixas' && r.method === 'POST',
+    );
+    expect(pedido.request.body).toEqual({
+      data: '2026-11-05',
+      valor: 500,
+      formaDePagamentoId: 'fp2',
+    });
+    // Enquanto a resposta não chega, o "Pagar" continua (a conta ainda não está paga).
+    await esperar(fixture);
+    expect(el.querySelector('[data-form-pagamento]')).not.toBeNull();
+
+    pedido.flush(conta(500, [baixa(500)]));
+    await esperar(fixture);
+
+    expect(texto(el.querySelector('[data-pagamento]'))).toBe('Paga · saldo R$ 0,00');
+    expect(texto(el.querySelector('[role="status"]'))).toBe('Conta paga');
+    expect(botao(el, 'pagar')).toBeNull();
+    expect(el.querySelector('[data-form-pagamento]')).toBeNull();
+    expect(texto(el.querySelector('[data-conta] [data-selo]'))).toBe('Paga');
+  });
+
+  it('409 ao pagar: recarrega a conta e mostra o saldo atual com a mensagem', async () => {
+    const { fixture, el } = await abrir([conta(500)]);
+    await abrirPagamento(fixture, el);
+    preencher(el, 'forma', PIX.id);
+    botao(el, 'confirmar-pagamento')!.click();
+
+    http
+      .expectOne((r) => r.url === '/api/financeiro/contas/k1/baixas')
+      .flush(
+        { mensagem: 'A conta foi alterada em outra operação. Atualize e tente de novo' },
+        { status: 409, statusText: 'Conflict' },
+      );
+    await esperar(fixture);
+    http
+      .expectOne((r) => r.url === '/api/financeiro/contas/k1' && r.method === 'GET')
+      .flush(conta(500, [baixa(300)]));
+    await esperar(fixture);
+
+    expect(texto(el.querySelector('[data-pagamento]'))).toBe('Parcialmente paga · saldo R$ 200,00');
+    expect(el.querySelectorAll('[data-baixa]').length).toBe(1);
+    expect(texto(el.querySelector('[role="alert"]'))).toBe(
+      'A conta foi alterada em outra operação. Atualize e tente de novo',
+    );
+    expect(texto(el.querySelector('[data-conta]'))).toContain(
+      'Parcialmente paga · saldo R$ 200,00',
+    );
+  });
+
+  it('409 ao estornar ("já foi estornado"): recarrega a conta e o "Estornar" some', async () => {
+    const { fixture, el } = await abrir([conta(350, [baixa(350)], 'Energia outubro')]);
+    botao(el, 'estornar')!.click();
+    await esperar(fixture);
+    preencher(el, 'motivo', 'Duplicado');
+    botao(el, 'confirmar-estorno')!.click();
+
+    http
+      .expectOne((r) => r.url === '/api/financeiro/baixas/b1/estorno')
+      .flush(
+        { mensagem: 'Este pagamento já foi estornado' },
+        { status: 409, statusText: 'Conflict' },
+      );
+    await esperar(fixture);
+    http
+      .expectOne((r) => r.url === '/api/financeiro/contas/k1' && r.method === 'GET')
+      .flush(conta(350, [baixa(350, { motivo: 'Outra sessão' })], 'Energia outubro'));
+    await esperar(fixture);
+
+    expect(texto(el.querySelector('[data-pagamento]'))).toBe('Sem pagamento · saldo R$ 350,00');
+    expect(botao(el, 'estornar')).toBeNull();
+    expect(texto(el.querySelector('[data-estorno]'))).toContain('por admin: Outra sessão');
+    expect(texto(el.querySelector('[role="alert"]'))).toBe('Este pagamento já foi estornado');
+  });
+
+  it('404 ao estornar: a conta foi excluída em outra sessão, sai da lista e o editor fecha', async () => {
+    const { fixture, el } = await abrir([conta(350, [baixa(350)], 'Energia outubro')]);
+    botao(el, 'estornar')!.click();
+    await esperar(fixture);
+    preencher(el, 'motivo', 'Errado');
+    botao(el, 'confirmar-estorno')!.click();
+
+    http
+      .expectOne((r) => r.url === '/api/financeiro/baixas/b1/estorno')
+      .flush({ mensagem: 'Pagamento não encontrado' }, { status: 404, statusText: 'Not Found' });
+    await esperar(fixture);
+
+    expect(el.querySelector('[data-conta]')).toBeNull();
+    expect(el.querySelector('[data-pagamentos]')).toBeNull();
+    expect(texto(el.querySelector('[role="alert"]'))).toBe('Pagamento não encontrado');
+  });
+
+  it('RN-23.7: descrição e observação alteradas e não salvas continuam depois de pagar', async () => {
+    const { fixture, el } = await abrir([conta(500)]);
+    preencher(el, 'descricao', 'Aluguel nov/26');
+    preencher(el, 'observacao', 'Combinar recibo');
+    await abrirPagamento(fixture, el);
+    preencher(el, 'valorPago', '200,00');
+    preencher(el, 'forma', PIX.id);
+    botao(el, 'confirmar-pagamento')!.click();
+
+    http
+      .expectOne((r) => r.url === '/api/financeiro/contas/k1/baixas')
+      .flush(conta(500, [baixa(200)]));
+    await esperar(fixture);
+
+    expect(texto(el.querySelector('[data-pagamento]'))).toBe('Parcialmente paga · saldo R$ 300,00');
+    expect(campo(el, 'descricao')!.value).toBe('Aluguel nov/26');
+    expect(campo<HTMLTextAreaElement>(el, 'observacao')!.value).toBe('Combinar recibo');
+    expect(campo(el, 'valor')!.disabled).toBe(true);
+
+    // Salvar manda a descrição e a observação editadas, com os campos travados como estão.
+    botao(el, 'salvar')!.click();
+    const salvar = http.expectOne(
+      (r) => r.url === '/api/financeiro/contas/k1' && r.method === 'PUT',
+    );
+    expect([salvar.request.body.descricao, salvar.request.body.observacao]).toEqual([
+      'Aluguel nov/26',
+      'Combinar recibo',
+    ]);
+    salvar.flush({
+      ...conta(500, [baixa(200)]),
+      descricao: 'Aluguel nov/26',
+      observacao: 'Combinar recibo',
+    });
+    await esperar(fixture);
   });
 
   it('cenário 23.2: R$ 600,00 numa conta de R$ 500,00 mostra a recusa do servidor', async () => {

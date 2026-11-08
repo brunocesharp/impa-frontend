@@ -131,6 +131,11 @@ export class FinanceiroService {
     return firstValueFrom(this.http.get<Conta[]>(CONTAS));
   }
 
+  /** A conta como está agora no servidor (ex.: depois de uma recusa 409); 404 se foi excluída. */
+  obterConta(id: string): Promise<Resultado<Conta>> {
+    return valor(this.http.get<Conta>(`${CONTAS}/${id}`));
+  }
+
   /** Devolve as parcelas criadas (cenário 23.1). */
   lancarConta(dados: DadosLancamento): Promise<Resultado<Conta[]>> {
     return valor(this.http.post<Conta[]>(CONTAS, dados));

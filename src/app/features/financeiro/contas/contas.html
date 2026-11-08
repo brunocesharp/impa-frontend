@@ -361,8 +361,11 @@
             @for (baixa of conta.baixas; track baixa.id) {
               <li data-baixa [class.estornada]="baixa.estornada">
                 <span class="baixa-linha">
-                  <span>{{ data(baixa.data) }} · {{ baixa.formaDePagamento }}</span>
-                  <span class="valor">{{ moeda(baixa.valor) }}</span>
+                  <span
+                    ><span data-baixa-data>{{ data(baixa.data) }}</span> ·
+                    <span data-baixa-forma>{{ baixa.formaDePagamento }}</span></span
+                  >
+                  <span class="valor" data-baixa-valor>{{ moeda(baixa.valor) }}</span>
                 </span>
                 @if (baixa.estornada) {
                   <span class="item-info" data-estorno>

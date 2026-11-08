@@ -70,6 +70,9 @@ const TRAVADOS_PELO_PAGAMENTO = [
   'numeroDocumento',
 ] as const;
 
+/** RN-23.7: os campos que continuam editáveis com pagamento. */
+const EDITAVEIS_COM_PAGAMENTO = ['descricao', 'observacao'] as const;
+
 const SITUACOES: Record<SituacaoDoPagamento, string> = {
   'sem-pagamento': 'Sem pagamento',
   'parcialmente-paga': 'Parcialmente paga',
@@ -456,10 +459,7 @@ export class Contas {
         valor: lerValor(v.valor)!,
         formaDePagamentoId: v.formaDePagamentoId,
       });
-      if (!resultado.ok)
-        return resultado.status === 404
-          ? this.excluidaEmOutraSessao(conta.id, resultado.mensagem)
-          : this.erro.set(resultado.mensagem);
+      if (!resultado.ok) return this.recusado(conta.id, resultado);
 
       this.atualizar(resultado.valor);
       this.aviso.set(resultado.valor.saldo === 0 ? 'Conta paga' : 'Pagamento registrado');
@@ -481,7 +481,8 @@ export class Contas {
   /** Estorna a baixa com o motivo (cenário 23.5): ela continua no histórico, marcada como estornada. */
   protected async estornar(): Promise<void> {
     const baixa = this.estornando();
-    if (!baixa || this.salvando() || !this.podeEditar()) return;
+    const conta = this.atual();
+    if (!baixa || !conta || this.salvando() || !this.podeEditar()) return;
     if (this.motivo.invalid) {
       this.motivo.markAsTouched();
       return;
@@ -489,17 +490,44 @@ export class Contas {
 
     await this.executar(async () => {
       const resultado = await this.servico.estornarBaixa(baixa, this.motivo.value.trim());
-      if (!resultado.ok) return this.erro.set(resultado.mensagem);
+      if (!resultado.ok) return this.recusado(conta.id, resultado);
 
       this.atualizar(resultado.valor);
       this.aviso.set('Pagamento estornado');
     });
   }
 
-  /** Conta devolvida pela API depois de pagar ou estornar: entra na lista e o editor reabre com as travas certas. */
+  /**
+   * Recusa de pagar ou estornar. 404: a conta (ou o pagamento, que sai junto com ela) foi excluída em outra sessão.
+   * 409 ("A conta foi alterada em outra operação…", "Este pagamento já foi estornado"): a conta aberta está velha —
+   * recarrega do servidor e reabre o editor com o saldo e o histórico atuais, mantendo a mensagem.
+   */
+  private async recusado(id: string, recusa: { mensagem: string; status: number }): Promise<void> {
+    if (recusa.status === 404) return this.excluidaEmOutraSessao(id, recusa.mensagem);
+    if (recusa.status === 409) {
+      const atual = await this.servico.obterConta(id);
+      if (atual.ok) this.atualizar(atual.valor);
+      else if (atual.status === 404) return this.excluidaEmOutraSessao(id, recusa.mensagem);
+    }
+    this.erro.set(recusa.mensagem);
+  }
+
+  /**
+   * Conta devolvida pela API depois de pagar ou estornar: entra na lista e o editor reabre com as travas certas.
+   * Descrição e observação alteradas e ainda não salvas continuam no formulário (RN-23.7: são as editáveis).
+   */
   private atualizar(conta: Conta): void {
+    const mesma = this.selecionada() === conta.id;
+    const naoSalvos = EDITAVEIS_COM_PAGAMENTO.filter(
+      (campo) => mesma && this.formulario.controls[campo].dirty,
+    ).map((campo) => ({ campo, valor: this.formulario.controls[campo].value }));
+
     this.contas.update((lista) => lista.map((c) => (c.id === conta.id ? conta : c)));
     this.selecionar(conta);
+    for (const { campo, valor } of naoSalvos) {
+      this.formulario.controls[campo].setValue(valor);
+      this.formulario.controls[campo].markAsDirty();
+    }
   }
 
   /** A conta não existe mais (excluída em outra sessão): sai da lista e o editor fecha. */
