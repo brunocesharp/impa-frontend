@@ -31,6 +31,7 @@ import {
   DadosConta,
   FinanceiroService,
   FormaDePagamento,
+  Recusa,
   SituacaoDoPagamento,
 } from '../financeiro.service';
 import {
@@ -387,10 +388,8 @@ export class Contas {
 
       const id = this.selecionada()!;
       const resultado = await this.servico.alterarConta(id, dados);
-      if (!resultado.ok)
-        return resultado.status === 404
-          ? this.excluidaEmOutraSessao(id, resultado.mensagem)
-          : this.erro.set(resultado.mensagem);
+      // 409 (concorrência): recarrega a conta, como no pagar e no estornar.
+      if (!resultado.ok) return this.recusado(id, resultado);
 
       const salva = resultado.valor;
       this.contas.update((lista) => ordenar(lista.map((c) => (c.id === salva.id ? salva : c))));
@@ -410,10 +409,8 @@ export class Contas {
     await this.executar(async () => {
       const resultado = await this.servico.excluirConta(conta.id);
       this.confirmandoExclusao.set(false);
-      if (!resultado.ok)
-        return resultado.status === 404
-          ? this.excluidaEmOutraSessao(conta.id, resultado.mensagem)
-          : this.erro.set(resultado.mensagem);
+      // 409 (concorrência ou "Conta com pagamento não pode ser excluída…"): recarrega a conta, com as travas atuais.
+      if (!resultado.ok) return this.recusado(conta.id, resultado);
 
       this.contas.update((lista) => lista.filter((c) => c.id !== conta.id));
       this.selecionada.set(null);
@@ -430,6 +427,11 @@ export class Contas {
     this.aviso.set(null);
     this.pagamento.reset({ data: hoje(), valor: paraCampo(conta.saldo), formaDePagamentoId: '' });
     this.pagando.set(true);
+    await this.carregarFormas();
+  }
+
+  /** As formas ativas, carregadas uma vez (de novo depois que o servidor recusar a forma escolhida). */
+  private async carregarFormas(): Promise<void> {
     if (this.formasCarregadas) return;
     try {
       this.formas.set(await this.servico.listarFormasDePagamento(false));
@@ -459,10 +461,18 @@ export class Contas {
         valor: lerValor(v.valor)!,
         formaDePagamentoId: v.formaDePagamentoId,
       });
-      if (!resultado.ok) return this.recusado(conta.id, resultado);
+      if (!resultado.ok) {
+        // A forma escolhida foi excluída (ou inativada) em outra sessão: recarrega as formas e limpa a escolha.
+        if (resultado.status === 400 && resultado.campos?.includes('FormaDePagamentoId')) {
+          this.formasCarregadas = false;
+          this.pagamento.controls.formaDePagamentoId.setValue('');
+          await this.carregarFormas();
+        }
+        return this.recusado(conta.id, resultado);
+      }
 
-      this.atualizar(resultado.valor);
-      this.aviso.set(resultado.valor.saldo === 0 ? 'Conta paga' : 'Pagamento registrado');
+      if (this.atualizar(resultado.valor))
+        this.aviso.set(resultado.valor.saldo === 0 ? 'Conta paga' : 'Pagamento registrado');
     });
   }
 
@@ -492,47 +502,53 @@ export class Contas {
       const resultado = await this.servico.estornarBaixa(baixa, this.motivo.value.trim());
       if (!resultado.ok) return this.recusado(conta.id, resultado);
 
-      this.atualizar(resultado.valor);
-      this.aviso.set('Pagamento estornado');
+      if (this.atualizar(resultado.valor)) this.aviso.set('Pagamento estornado');
     });
   }
 
   /**
-   * Recusa de pagar ou estornar. 404: a conta (ou o pagamento, que sai junto com ela) foi excluída em outra sessão.
-   * 409 ("A conta foi alterada em outra operação…", "Este pagamento já foi estornado"): a conta aberta está velha —
-   * recarrega do servidor e reabre o editor com o saldo e o histórico atuais, mantendo a mensagem.
+   * Recusa de salvar, excluir, pagar ou estornar. 404: a conta (ou o pagamento, que sai junto com ela) foi excluída em
+   * outra sessão. 409 ("A conta foi alterada em outra operação…", "Este pagamento já foi estornado", "Conta com
+   * pagamento não pode ser excluída…"): a conta aberta está velha — recarrega do servidor e reabre o editor com o saldo,
+   * o histórico e as travas atuais, mantendo a mensagem. Se outra conta foi aberta enquanto isso, só a lista muda.
    */
-  private async recusado(id: string, recusa: { mensagem: string; status: number }): Promise<void> {
+  private async recusado(id: string, recusa: Recusa): Promise<void> {
     if (recusa.status === 404) return this.excluidaEmOutraSessao(id, recusa.mensagem);
     if (recusa.status === 409) {
       const atual = await this.servico.obterConta(id);
       if (atual.ok) this.atualizar(atual.valor);
       else if (atual.status === 404) return this.excluidaEmOutraSessao(id, recusa.mensagem);
     }
-    this.erro.set(recusa.mensagem);
+    if (this.selecionada() === id) this.erro.set(recusa.mensagem);
   }
 
   /**
-   * Conta devolvida pela API depois de pagar ou estornar: entra na lista e o editor reabre com as travas certas.
-   * Descrição e observação alteradas e ainda não salvas continuam no formulário (RN-23.7: são as editáveis).
+   * Conta devolvida pela API (pagar, estornar ou a recarga de um 409): entra na lista e, se ainda for a conta aberta,
+   * o editor reabre com as travas certas — descrição e observação alteradas e ainda não salvas continuam no formulário
+   * (RN-23.7: são as editáveis). Se outra conta foi aberta enquanto isso, o editor dela não muda. Devolve se reabriu.
    */
-  private atualizar(conta: Conta): void {
-    const mesma = this.selecionada() === conta.id;
-    const naoSalvos = EDITAVEIS_COM_PAGAMENTO.filter(
-      (campo) => mesma && this.formulario.controls[campo].dirty,
-    ).map((campo) => ({ campo, valor: this.formulario.controls[campo].value }));
-
+  private atualizar(conta: Conta): boolean {
     this.contas.update((lista) => lista.map((c) => (c.id === conta.id ? conta : c)));
+    if (this.selecionada() !== conta.id) return false;
+
+    const naoSalvos = EDITAVEIS_COM_PAGAMENTO.filter(
+      (campo) => this.formulario.controls[campo].dirty,
+    ).map((campo) => ({ campo, valor: this.formulario.controls[campo].value }));
     this.selecionar(conta);
     for (const { campo, valor } of naoSalvos) {
       this.formulario.controls[campo].setValue(valor);
       this.formulario.controls[campo].markAsDirty();
     }
+    return true;
   }
 
-  /** A conta não existe mais (excluída em outra sessão): sai da lista e o editor fecha. */
+  /**
+   * A conta não existe mais (excluída em outra sessão): sai da lista e, se ainda for a conta aberta, o editor fecha com
+   * a mensagem. O editor de outra conta aberta enquanto isso não muda.
+   */
   private excluidaEmOutraSessao(id: string, mensagem: string): void {
     this.contas.update((lista) => lista.filter((c) => c.id !== id));
+    if (this.selecionada() !== id) return;
     this.selecionada.set(null);
     this.erro.set(mensagem);
   }

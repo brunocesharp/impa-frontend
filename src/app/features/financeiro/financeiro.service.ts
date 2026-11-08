@@ -83,10 +83,19 @@ export interface DadosLancamento extends DadosConta {
   parcelas: number;
 }
 
-/** Recusa: `status` é o HTTP (ex.: 404 quando a conta foi excluída em outra sessão). */
+/**
+ * Recusa: `status` é o HTTP (ex.: 404 quando a conta foi excluída em outra sessão); `campos`, os campos recusados
+ * num 400 (`errors.{Campo}`, ex.: `FormaDePagamentoId`).
+ */
 export type Resultado<T = void> =
-  | ({ ok: true } & (T extends void ? unknown : { valor: T }))
-  | { ok: false; mensagem: string; status: number };
+  ({ ok: true } & (T extends void ? unknown : { valor: T })) | Recusa;
+
+export interface Recusa {
+  ok: false;
+  mensagem: string;
+  status: number;
+  campos?: string[];
+}
 
 const CATEGORIAS = '/api/financeiro/categorias';
 const CONTAS = '/api/financeiro/contas';
@@ -204,7 +213,7 @@ async function vazio(pedido: Observable<void>): Promise<Resultado> {
   }
 }
 
-function recusa(erro: unknown): { ok: false; mensagem: string; status: number } {
+function recusa(erro: unknown): Recusa {
   if (!(erro instanceof HttpErrorResponse) || ![400, 403, 404, 409].includes(erro.status))
     throw erro;
 
@@ -214,6 +223,7 @@ function recusa(erro: unknown): { ok: false; mensagem: string; status: number } 
   return {
     ok: false,
     status: erro.status,
+    ...(corpo?.errors ? { campos: Object.keys(corpo.errors) } : {}),
     mensagem:
       mensagem ||
       (erro.status === 403
