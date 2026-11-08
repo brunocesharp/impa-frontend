@@ -35,6 +35,10 @@ function parcela(numero: number, valor: number, vencimento: string): Conta {
     parcela: numero,
     totalDeParcelas: 3,
     parcelamentoId: 'g1',
+    valorPago: 0,
+    saldo: valor,
+    situacaoDoPagamento: 'sem-pagamento',
+    baixas: [],
   };
 }
 

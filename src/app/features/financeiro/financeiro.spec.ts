@@ -15,10 +15,15 @@ describe('Menu Contas (story 11-1)', () => {
 
     expect(contas.data).toEqual({ titulo: 'Contas', permissao: 'financeiro.ver' });
     expect(await contas.loadComponent!()).toBe(Financeiro);
-    expect(contas.children!.map((r) => r.path)).toEqual(['', 'a-pagar', 'categorias']);
+    expect(contas.children!.map((r) => r.path)).toEqual([
+      '',
+      'a-pagar',
+      'categorias',
+      'formas-pagamento',
+    ]);
   });
 
-  it('mostra as abas Contas a pagar e Categorias', async () => {
+  it('mostra as abas Contas a pagar, Categorias e Formas de pagamento (11-2)', async () => {
     TestBed.configureTestingModule({ imports: [Financeiro], providers: [provideRouter([])] });
     const fixture = TestBed.createComponent(Financeiro);
     await fixture.whenStable();
@@ -28,6 +33,6 @@ describe('Menu Contas (story 11-1)', () => {
       Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('[data-aba]')).map((a) =>
         a.textContent!.trim(),
       ),
-    ).toEqual(['Contas a pagar', 'Categorias']);
+    ).toEqual(['Contas a pagar', 'Categorias', 'Formas de pagamento']);
   });
 });

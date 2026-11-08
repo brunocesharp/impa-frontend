@@ -10,7 +10,37 @@ export interface Categoria {
   ativa: boolean;
 }
 
-/** Conta (uma parcela) de `/api/financeiro/contas`. `vencimento` em `AAAA-MM-DD`; documento do fornecedor com máscara. */
+/** Forma de pagamento financeira de `/api/financeiro/formas-pagamento` (story 11-2, RN-23.4). */
+export interface FormaDePagamento {
+  id: string;
+  nome: string;
+  ativa: boolean;
+}
+
+/**
+ * Baixa (pagamento) da conta (RN-23.5). `data` em `AAAA-MM-DD`. Estornada: `estornadaEm`, `estornadaPor` (login) e
+ * `motivoDoEstorno` preenchidos — a baixa estornada continua no histórico e não conta no saldo.
+ */
+export interface Baixa {
+  id: string;
+  data: string;
+  valor: number;
+  formaDePagamentoId: string;
+  formaDePagamento: string;
+  registradaEm: string;
+  estornada: boolean;
+  estornadaEm: string | null;
+  estornadaPor: string | null;
+  motivoDoEstorno: string | null;
+}
+
+/** Situação da conta quanto ao pagamento (RN-23.5). A situação pelo vencimento (RN-23.6) é da story 11.3. */
+export type SituacaoDoPagamento = 'sem-pagamento' | 'parcialmente-paga' | 'paga';
+
+/**
+ * Conta (uma parcela) de `/api/financeiro/contas`. `vencimento` em `AAAA-MM-DD`; documento do fornecedor com máscara.
+ * `saldo` = valor − baixas não estornadas (story 11-2).
+ */
 export interface Conta {
   id: string;
   descricao: string;
@@ -24,6 +54,17 @@ export interface Conta {
   parcela: number;
   totalDeParcelas: number;
   parcelamentoId: string | null;
+  valorPago: number;
+  saldo: number;
+  situacaoDoPagamento: SituacaoDoPagamento;
+  baixas: Baixa[];
+}
+
+/** Pagar (RN-23.5): data do pagamento (`AAAA-MM-DD`), valor (no máximo o saldo) e forma. */
+export interface DadosPagamento {
+  data: string;
+  valor: number;
+  formaDePagamentoId: string;
 }
 
 /** Campos de alterar uma conta. `fornecedorDocumento`: CNPJ/CPF de um fornecedor cadastrado, ou nulo. */
@@ -49,9 +90,11 @@ export type Resultado<T = void> =
 
 const CATEGORIAS = '/api/financeiro/categorias';
 const CONTAS = '/api/financeiro/contas';
+const FORMAS = '/api/financeiro/formas-pagamento';
+const BAIXAS = '/api/financeiro/baixas';
 
 /**
- * Chamadas de `/api/financeiro` (story 11-1). Recusas do servidor (400, 403, 404, 409) voltam como `mensagem` — ex.:
+ * Chamadas de `/api/financeiro` (stories 11-1 e 11-2). Recusas do servidor (400, 403, 404, 409) voltam como `mensagem` — ex.:
  * "Esta categoria tem contas. Você pode inativá-la"; o resto é propagado.
  */
 @Injectable({ providedIn: 'root' })
@@ -97,8 +140,45 @@ export class FinanceiroService {
     return valor(this.http.put<Conta>(`${CONTAS}/${id}`, dados));
   }
 
+  /** Com pagamento, o servidor recusa (RN-23.7). */
   excluirConta(id: string): Promise<Resultado> {
     return vazio(this.http.delete<void>(`${CONTAS}/${id}`));
+  }
+
+  /** Registra a baixa e devolve a conta com o saldo novo (cenário 23.2). Valor acima do saldo: recusa com a mensagem. */
+  pagarConta(id: string, dados: DadosPagamento): Promise<Resultado<Conta>> {
+    return valor(this.http.post<Conta>(`${CONTAS}/${id}/baixas`, dados));
+  }
+
+  /** Estorna a baixa com motivo e devolve a conta com o saldo de volta (cenário 23.5). */
+  estornarBaixa(id: string, motivo: string): Promise<Resultado<Conta>> {
+    return valor(this.http.post<Conta>(`${BAIXAS}/${id}/estorno`, { motivo }));
+  }
+
+  listarFormasDePagamento(incluirInativas: boolean): Promise<FormaDePagamento[]> {
+    const params = incluirInativas ? new HttpParams().set('incluirInativas', 'true') : undefined;
+    return firstValueFrom(this.http.get<FormaDePagamento[]>(FORMAS, { params }));
+  }
+
+  criarFormaDePagamento(nome: string): Promise<Resultado<FormaDePagamento>> {
+    return valor(this.http.post<FormaDePagamento>(FORMAS, { nome }));
+  }
+
+  alterarFormaDePagamento(id: string, nome: string): Promise<Resultado<FormaDePagamento>> {
+    return valor(this.http.put<FormaDePagamento>(`${FORMAS}/${id}`, { nome }));
+  }
+
+  inativarFormaDePagamento(id: string): Promise<Resultado> {
+    return vazio(this.http.post<void>(`${FORMAS}/${id}/inativar`, null));
+  }
+
+  reativarFormaDePagamento(id: string): Promise<Resultado> {
+    return vazio(this.http.post<void>(`${FORMAS}/${id}/reativar`, null));
+  }
+
+  /** Com pagamentos, o servidor recusa: só inativar. */
+  excluirFormaDePagamento(id: string): Promise<Resultado> {
+    return vazio(this.http.delete<void>(`${FORMAS}/${id}`));
   }
 }
 

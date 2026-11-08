@@ -105,7 +105,7 @@ export const routes: Routes = [
           ),
       },
       {
-        // Story 11-1: contas a pagar e categorias financeiras, em abas.
+        // Stories 11-1 e 11-2: contas a pagar, categorias e formas de pagamento financeiras, em abas.
         path: 'contas',
         canActivate: [permissaoGuard],
         data: { titulo: 'Contas', permissao: 'financeiro.ver' },
@@ -126,13 +126,25 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./features/financeiro/categorias/categorias').then((m) => m.Categorias),
           },
+          {
+            // Story 11-2: formas de pagamento financeiras (RN-23.4).
+            path: 'formas-pagamento',
+            title: 'Formas de pagamento · IMPA',
+            data: { titulo: 'Formas de pagamento' },
+            loadComponent: () =>
+              import('./features/financeiro/formas-pagamento/formas-pagamento').then(
+                (m) => m.FormasPagamento,
+              ),
+          },
         ],
       },
       // Telas ainda não construídas: cada item do menu leva a "Em construção".
       ...MENU.filter((item) => item.rota !== '' && !COM_TELA.has(item.rota)).map((item) => ({
         path: item.rota,
         title: `${item.rotulo} · IMPA`,
-        canActivate: ROTAS_DE_TERMINAL.has(item.rota) ? [permissaoGuard, terminalGuard] : [permissaoGuard],
+        canActivate: ROTAS_DE_TERMINAL.has(item.rota)
+          ? [permissaoGuard, terminalGuard]
+          : [permissaoGuard],
         data: { titulo: item.rotulo, permissao: item.permissao },
         loadComponent: () =>
           import('./features/em-construcao/em-construcao').then((m) => m.EmConstrucao),

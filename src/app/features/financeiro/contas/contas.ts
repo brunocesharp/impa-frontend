@@ -6,10 +6,12 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, debounceTime, distinctUntilChanged, from, switchMap } from 'rxjs';
 import {
   AbstractControl,
+  FormControl,
   NonNullableFormBuilder,
   ReactiveFormsModule,
   ValidationErrors,
@@ -22,7 +24,15 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { AuthService } from '../../../core/auth/auth.service';
 import { Fornecedor, PessoasService } from '../../pessoas/pessoas.service';
-import { Categoria, Conta, DadosConta, FinanceiroService } from '../financeiro.service';
+import {
+  Baixa,
+  Categoria,
+  Conta,
+  DadosConta,
+  FinanceiroService,
+  FormaDePagamento,
+  SituacaoDoPagamento,
+} from '../financeiro.service';
 import {
   PARCELAS_MAXIMO,
   VALOR_MAXIMO,
@@ -41,6 +51,40 @@ function valorDaConta(controle: AbstractControl<string>): ValidationErrors | nul
   if (valor === null) return { formato: true };
   if (!(valor > 0)) return { positivo: true };
   return valor > VALOR_MAXIMO ? { teto: true } : null;
+}
+
+/** RN-23.5: valor pago obrigatório e maior que zero, com até dois decimais (o teto é o saldo, conferido pela API). */
+function valorDoPagamento(controle: AbstractControl<string>): ValidationErrors | null {
+  if (!controle.value?.trim()) return { required: true };
+  const valor = lerValor(controle.value);
+  if (valor === null) return { formato: true };
+  return valor > 0 ? null : { positivo: true };
+}
+
+/** Campos que a RN-23.7 trava numa conta com pagamento (só descrição e observação continuam editáveis). */
+const TRAVADOS_PELO_PAGAMENTO = [
+  'categoriaId',
+  'valor',
+  'vencimento',
+  'fornecedor',
+  'numeroDocumento',
+] as const;
+
+const SITUACOES: Record<SituacaoDoPagamento, string> = {
+  'sem-pagamento': 'Sem pagamento',
+  'parcialmente-paga': 'Parcialmente paga',
+  paga: 'Paga',
+};
+
+/** Hoje no fuso do navegador, em `AAAA-MM-DD`. */
+function hoje(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Valor em reais para um campo de texto: 300 → "300,00". */
+function paraCampo(valor: number): string {
+  return valor.toFixed(2).replace('.', ',');
 }
 
 /** Fornecedor oferecido no select: o valor do select é o `id`; a API recebe o `documento`. */
@@ -77,14 +121,17 @@ export function formularioDeConta(fb: NonNullableFormBuilder) {
 }
 
 /**
- * Contas → Contas a pagar (story 11-1): lista das contas (uma linha por parcela), lançamento com prévia das parcelas
- * antes de salvar (cenário 23.1, RN-23.3), alteração e exclusão de uma parcela. Consultar com `financeiro.ver`;
- * lançar, alterar e excluir com `financeiro.editar`. O fornecedor vem do cadastro de Pessoas: com
+ * Contas → Contas a pagar (stories 11-1 e 11-2): lista das contas (uma linha por parcela), lançamento com prévia das
+ * parcelas antes de salvar (cenário 23.1, RN-23.3), alteração e exclusão de uma parcela, pagamento total ou parcial
+ * (cenário 23.2, RN-23.5) e histórico das baixas com estorno (cenário 23.5). Com pagamento, só descrição e observação
+ * são editáveis e a conta não é excluída (RN-23.7). Consultar com `financeiro.ver`; lançar, alterar, excluir, pagar e
+ * estornar com `financeiro.editar`. O fornecedor vem do cadastro de Pessoas: com
  * `fornecedores.gerenciar`, escolhido na lista; sem ela, pelo CNPJ/CPF.
  */
 @Component({
   selector: 'app-contas',
   imports: [
+    DatePipe,
     ReactiveFormsModule,
     MatButtonModule,
     MatCardModule,
@@ -117,6 +164,28 @@ export class Contas {
   protected readonly aviso = signal<string | null>(null);
 
   protected readonly formulario = formularioDeConta(inject(NonNullableFormBuilder));
+
+  /** Pagamento (RN-23.5): data, valor (o saldo sugerido) e forma. */
+  protected readonly pagamento = inject(NonNullableFormBuilder).group({
+    data: ['', Validators.required],
+    valor: ['', valorDoPagamento],
+    formaDePagamentoId: ['', Validators.required],
+  });
+  protected readonly pagando = signal(false);
+  protected readonly formas = signal<FormaDePagamento[]>([]);
+  private formasCarregadas = false;
+
+  /** Baixa com o estorno aberto (pedindo o motivo). */
+  protected readonly estornando = signal<string | null>(null);
+  protected readonly motivo = new FormControl('', {
+    nonNullable: true,
+    validators: [Validators.required, Validators.maxLength(500), Validators.pattern(/\S/)],
+  });
+
+  protected readonly situacao = (s: SituacaoDoPagamento) => SITUACOES[s];
+
+  /** RN-23.7: a conta aberta tem baixa não estornada. */
+  protected readonly comPagamento = computed(() => (this.atual()?.valorPago ?? 0) > 0);
   private readonly alteracoes = signal(0);
 
   protected readonly moeda = formatarMoeda;
@@ -228,6 +297,8 @@ export class Contas {
   protected selecionar(conta: Conta): void {
     this.selecionada.set(conta.id);
     this.prepararEdicao();
+    this.pagando.set(false);
+    this.estornando.set(null);
     this.formulario.reset({
       descricao: conta.descricao,
       categoriaId: conta.categoriaId,
@@ -240,11 +311,16 @@ export class Contas {
       numeroDocumento: conta.numeroDocumento ?? '',
       observacao: conta.observacao ?? '',
     });
+    // RN-23.7: com pagamento, só descrição e observação ficam editáveis.
+    if (conta.valorPago > 0)
+      for (const campo of TRAVADOS_PELO_PAGAMENTO) this.formulario.controls[campo].disable();
   }
 
   protected criarNova(): void {
     this.selecionada.set(NOVA);
     this.prepararEdicao();
+    this.pagando.set(false);
+    this.estornando.set(null);
     this.formulario.reset();
   }
 
@@ -266,15 +342,28 @@ export class Contas {
     }
 
     const v = this.formulario.getRawValue();
-    const dados: DadosConta = {
-      descricao: v.descricao.trim(),
-      categoriaId: v.categoriaId,
-      valor: lerValor(v.valor)!,
-      vencimento: v.vencimento,
-      fornecedorDocumento: this.documentoDoFornecedor(v.fornecedor),
-      numeroDocumento: v.numeroDocumento.trim() || null,
-      observacao: v.observacao.trim() || null,
-    };
+    const conta = this.atual();
+    const dados: DadosConta =
+      conta && conta.valorPago > 0
+        ? {
+            // RN-23.7: os campos travados vão como estão na conta.
+            descricao: v.descricao.trim(),
+            categoriaId: conta.categoriaId,
+            valor: conta.valor,
+            vencimento: conta.vencimento,
+            fornecedorDocumento: conta.fornecedor?.documento ?? null,
+            numeroDocumento: conta.numeroDocumento,
+            observacao: v.observacao.trim() || null,
+          }
+        : {
+            descricao: v.descricao.trim(),
+            categoriaId: v.categoriaId,
+            valor: lerValor(v.valor)!,
+            vencimento: v.vencimento,
+            fornecedorDocumento: this.documentoDoFornecedor(v.fornecedor),
+            numeroDocumento: v.numeroDocumento.trim() || null,
+            observacao: v.observacao.trim() || null,
+          };
 
     await this.executar(async () => {
       if (this.nova()) {
@@ -327,6 +416,90 @@ export class Contas {
       this.selecionada.set(null);
       this.aviso.set('Conta excluída');
     });
+  }
+
+  /** Abre o pagamento com a data de hoje e o saldo sugerido (RN-23.5). */
+  protected async abrirPagamento(): Promise<void> {
+    const conta = this.atual();
+    if (!conta || !this.podeEditar()) return;
+    this.estornando.set(null);
+    this.erro.set(null);
+    this.aviso.set(null);
+    this.pagamento.reset({ data: hoje(), valor: paraCampo(conta.saldo), formaDePagamentoId: '' });
+    this.pagando.set(true);
+    if (this.formasCarregadas) return;
+    try {
+      this.formas.set(await this.servico.listarFormasDePagamento(false));
+      this.formasCarregadas = true;
+    } catch {
+      this.erro.set('Não foi possível carregar as formas de pagamento. Tente de novo.');
+    }
+  }
+
+  protected cancelarPagamento(): void {
+    this.pagando.set(false);
+  }
+
+  /** Registra a baixa; valor maior que o saldo volta recusado com a mensagem do servidor (cenário 23.2). */
+  protected async pagar(): Promise<void> {
+    const conta = this.atual();
+    if (!conta || this.salvando() || !this.podeEditar()) return;
+    if (this.pagamento.invalid) {
+      this.pagamento.markAllAsTouched();
+      return;
+    }
+
+    const v = this.pagamento.getRawValue();
+    await this.executar(async () => {
+      const resultado = await this.servico.pagarConta(conta.id, {
+        data: v.data,
+        valor: lerValor(v.valor)!,
+        formaDePagamentoId: v.formaDePagamentoId,
+      });
+      if (!resultado.ok)
+        return resultado.status === 404
+          ? this.excluidaEmOutraSessao(conta.id, resultado.mensagem)
+          : this.erro.set(resultado.mensagem);
+
+      this.atualizar(resultado.valor);
+      this.aviso.set(resultado.valor.saldo === 0 ? 'Conta paga' : 'Pagamento registrado');
+    });
+  }
+
+  protected abrirEstorno(baixa: Baixa): void {
+    this.pagando.set(false);
+    this.erro.set(null);
+    this.aviso.set(null);
+    this.motivo.reset('');
+    this.estornando.set(baixa.id);
+  }
+
+  protected cancelarEstorno(): void {
+    this.estornando.set(null);
+  }
+
+  /** Estorna a baixa com o motivo (cenário 23.5): ela continua no histórico, marcada como estornada. */
+  protected async estornar(): Promise<void> {
+    const baixa = this.estornando();
+    if (!baixa || this.salvando() || !this.podeEditar()) return;
+    if (this.motivo.invalid) {
+      this.motivo.markAsTouched();
+      return;
+    }
+
+    await this.executar(async () => {
+      const resultado = await this.servico.estornarBaixa(baixa, this.motivo.value.trim());
+      if (!resultado.ok) return this.erro.set(resultado.mensagem);
+
+      this.atualizar(resultado.valor);
+      this.aviso.set('Pagamento estornado');
+    });
+  }
+
+  /** Conta devolvida pela API depois de pagar ou estornar: entra na lista e o editor reabre com as travas certas. */
+  private atualizar(conta: Conta): void {
+    this.contas.update((lista) => lista.map((c) => (c.id === conta.id ? conta : c)));
+    this.selecionar(conta);
   }
 
   /** A conta não existe mais (excluída em outra sessão): sai da lista e o editor fecha. */
