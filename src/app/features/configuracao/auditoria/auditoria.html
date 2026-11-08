@@ -1,0 +1,118 @@
+<div class="topo">
+  <a mat-button routerLink="/configuracao">
+    <mat-icon>arrow_back</mat-icon>
+    Configuração
+  </a>
+</div>
+
+<mat-card appearance="outlined" class="filtros">
+  <form [formGroup]="filtros" (ngSubmit)="filtrar()" novalidate data-filtros>
+    <mat-form-field appearance="outline">
+      <mat-label>De</mat-label>
+      <input matInput type="date" data-filtro="de" formControlName="de" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Até</mat-label>
+      <input matInput type="date" data-filtro="ate" formControlName="ate" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Usuário</mat-label>
+      <input matInput data-filtro="usuario" formControlName="usuario" autocomplete="off" />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Módulo</mat-label>
+      <input
+        matInput
+        data-filtro="modulo"
+        formControlName="modulo"
+        placeholder="Ex.: Catalogo, Fiscal"
+        autocomplete="off"
+      />
+    </mat-form-field>
+    <mat-form-field appearance="outline">
+      <mat-label>Entidade</mat-label>
+      <input
+        matInput
+        data-filtro="entidade"
+        formControlName="entidade"
+        placeholder="Ex.: Item"
+        autocomplete="off"
+      />
+    </mat-form-field>
+    <div class="acoes">
+      <button mat-button type="button" data-acao="limpar" (click)="limpar()">Limpar</button>
+      <button mat-flat-button type="submit" data-acao="filtrar" [disabled]="carregando()">
+        <mat-icon>filter_alt</mat-icon>
+        Filtrar
+      </button>
+    </div>
+  </form>
+</mat-card>
+
+@if (erro()) {
+  <p class="erro" role="alert">{{ erro() }}</p>
+}
+
+@if (resultado(); as r) {
+  <mat-card appearance="outlined" class="lista">
+    <div class="cabecalho">
+      <h2>Operações sensíveis</h2>
+      <span class="total" data-total
+        >{{ r.total }} {{ r.total === 1 ? 'registro' : 'registros' }}</span
+      >
+    </div>
+    <ul role="list">
+      @for (registro of r.itens; track registro.id) {
+        <li class="registro" data-registro>
+          <div class="registro-topo">
+            <span class="data" data-data>{{ registro.ocorreuEm | date: 'dd/MM/yyyy HH:mm' }}</span>
+            <span class="usuario" data-usuario>{{ registro.usuarioNome }}</span>
+          </div>
+          <div class="operacao" data-operacao>
+            {{ registro.operacao }}
+            <span class="origem"
+              >· {{ registro.modulo }} · {{ registro.entidade }} {{ registro.entidadeId }}</span
+            >
+          </div>
+          <ul class="campos" role="list">
+            @for (campo of registro.campos; track campo.campo) {
+              <li data-campo [class.protegido]="campo.omitido">
+                <span class="campo-nome">{{ campo.campo }}:</span>
+                {{ antesEDepois(campo) }}
+              </li>
+            }
+          </ul>
+        </li>
+      } @empty {
+        <li class="estado">Nenhuma operação encontrada com esses filtros.</li>
+      }
+    </ul>
+    @if (paginas() > 1) {
+      <div class="paginacao">
+        <button
+          mat-button
+          type="button"
+          data-acao="anterior"
+          [disabled]="r.pagina <= 1 || carregando()"
+          (click)="irPara(r.pagina - 1)"
+        >
+          <mat-icon>chevron_left</mat-icon>
+          Anterior
+        </button>
+        <span data-pagina>Página {{ r.pagina }} de {{ paginas() }}</span>
+        <button
+          mat-button
+          type="button"
+          data-acao="proxima"
+          [disabled]="r.pagina >= paginas() || carregando()"
+          (click)="irPara(r.pagina + 1)"
+        >
+          Próxima
+          <mat-icon iconPositionEnd>chevron_right</mat-icon>
+        </button>
+      </div>
+    }
+  </mat-card>
+} @else if (carregando()) {
+  <p class="estado">Carregando a auditoria…</p>
+}
