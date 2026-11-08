@@ -96,6 +96,15 @@ export const routes: Routes = [
           import('./features/configuracao/terminais/terminais').then((m) => m.Terminais),
       },
       {
+        // Story 4.4 (M1.6): quem alterou o quê e quando nas operações sensíveis.
+        path: 'configuracao/auditoria',
+        title: 'Auditoria · IMPA',
+        canActivate: [permissaoGuard],
+        data: { titulo: 'Auditoria', permissao: 'auditoria.ver' },
+        loadComponent: () =>
+          import('./features/configuracao/auditoria/auditoria').then((m) => m.Auditoria),
+      },
+      {
         path: 'terminal-nao-registrado',
         title: 'Terminal não registrado · IMPA',
         data: { titulo: 'Terminal não registrado' },
@@ -108,7 +117,9 @@ export const routes: Routes = [
       ...MENU.filter((item) => item.rota !== '' && !COM_TELA.has(item.rota)).map((item) => ({
         path: item.rota,
         title: `${item.rotulo} · IMPA`,
-        canActivate: ROTAS_DE_TERMINAL.has(item.rota) ? [permissaoGuard, terminalGuard] : [permissaoGuard],
+        canActivate: ROTAS_DE_TERMINAL.has(item.rota)
+          ? [permissaoGuard, terminalGuard]
+          : [permissaoGuard],
         data: { titulo: item.rotulo, permissao: item.permissao },
         loadComponent: () =>
           import('./features/em-construcao/em-construcao').then((m) => m.EmConstrucao),

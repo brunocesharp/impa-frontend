@@ -35,6 +35,15 @@ describe('Configuracao', () => {
     expect(secoes[0].getAttribute('href')).toBe('/terminais');
   });
 
+  it('mostra Auditoria só para quem tem auditoria.ver (story 4.4)', () => {
+    const com = abrir(['configuracao.ver', 'auditoria.ver']);
+
+    const secoes = Array.from(com.querySelectorAll('[data-secao]'));
+    expect(secoes).toHaveLength(1);
+    expect(secoes[0].textContent).toContain('Auditoria');
+    expect(secoes[0].getAttribute('href')).toBe('/auditoria');
+  });
+
   it('sem perfis.gerenciar, não mostra Perfis', () => {
     const el = abrir(['configuracao.ver']);
 
@@ -58,6 +67,13 @@ describe('rotas de Configuração', () => {
 
     expect(terminais.data).toEqual(expect.objectContaining({ permissao: 'terminais.gerenciar' }));
     expect(terminais.canActivate).toHaveLength(1);
+  });
+
+  it('Configuração → Auditoria exige auditoria.ver (story 4.4)', () => {
+    const auditoria = filhas.find((r) => r.path === 'configuracao/auditoria')!;
+
+    expect(auditoria.data).toEqual(expect.objectContaining({ permissao: 'auditoria.ver' }));
+    expect(auditoria.canActivate).toHaveLength(1);
   });
 
   it('PDV (Vendas) e Caixa exigem terminal registrado; as demais funções não (story 1-6, RN-11.1)', () => {

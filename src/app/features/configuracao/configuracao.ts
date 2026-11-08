@@ -35,9 +35,16 @@ export const SECOES_CONFIGURACAO: readonly Secao[] = [
     icone: 'devices',
     permissao: 'terminais.gerenciar',
   },
+  {
+    rota: 'auditoria',
+    titulo: 'Auditoria',
+    descricao: 'Quem alterou o quê e quando: preço, custo, tributação, estoque, caixa e fiscal',
+    icone: 'history',
+    permissao: 'auditoria.ver',
+  },
 ];
 
-/** Configuração (stories 1-3, 1-4 e 1-6): ponto de entrada das seções — Perfis, Usuários e Terminais. */
+/** Configuração (stories 1-3, 1-4, 1-6 e 4-4): ponto de entrada das seções — Perfis, Usuários, Terminais e Auditoria. */
 @Component({
   selector: 'app-configuracao',
   imports: [MatCardModule, MatIconModule, RouterLink],
