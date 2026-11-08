@@ -103,6 +103,8 @@
           />
           @if (formulario.controls.valor.hasError('positivo')) {
             <mat-error>O valor precisa ser maior que zero</mat-error>
+          } @else if (formulario.controls.valor.hasError('teto')) {
+            <mat-error>O valor pode ser de no máximo R$ 999.999.999.999,99</mat-error>
           } @else if (formulario.controls.valor.hasError('formato')) {
             <mat-error>Use um valor como 1.000,00</mat-error>
           } @else if (formulario.controls.valor.hasError('required')) {
@@ -140,8 +142,8 @@
           @if (escolheFornecedor()) {
             <select matNativeControl data-campo="fornecedor" formControlName="fornecedor">
               <option value="">Sem fornecedor</option>
-              @for (fornecedor of opcoesDeFornecedor(); track fornecedor.documento) {
-                <option [value]="fornecedor.documento">{{ fornecedor.nome }}</option>
+              @for (fornecedor of opcoesDeFornecedor(); track fornecedor.id) {
+                <option [value]="fornecedor.id">{{ fornecedor.nome }}</option>
               }
             </select>
           } @else {
@@ -149,11 +151,27 @@
               matInput
               data-campo="fornecedor"
               formControlName="fornecedor"
+              maxlength="18"
               placeholder="CNPJ ou CPF do fornecedor"
               autocomplete="off"
             />
           }
         </mat-form-field>
+
+        @if (escolheFornecedor() && podeEditar()) {
+          <mat-form-field appearance="outline">
+            <mat-label>Buscar fornecedor</mat-label>
+            <input
+              matInput
+              type="search"
+              data-campo="buscaFornecedor"
+              placeholder="Razão social, fantasia ou CNPJ/CPF"
+              autocomplete="off"
+              (input)="buscarFornecedor($any($event.target).value)"
+            />
+            <mat-icon matSuffix>search</mat-icon>
+          </mat-form-field>
+        }
 
         <mat-form-field appearance="outline">
           <mat-label>Número do documento (opcional)</mat-label>

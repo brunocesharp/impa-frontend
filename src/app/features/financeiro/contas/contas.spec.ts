@@ -57,6 +57,7 @@ describe('Contas a pagar (story 11-1)', () => {
   async function abrir(
     contas: Conta[] = [],
     permissoes = ['financeiro.ver', 'financeiro.editar', 'fornecedores.gerenciar'],
+    fornecedores: Fornecedor[] = [ALFA],
   ) {
     TestBed.configureTestingModule({
       imports: [Contas],
@@ -76,7 +77,7 @@ describe('Contas a pagar (story 11-1)', () => {
     if (permissoes.includes('fornecedores.gerenciar'))
       http
         .expectOne((r) => r.url === '/api/pessoas/fornecedores' && r.method === 'GET')
-        .flush([ALFA]);
+        .flush(fornecedores);
     await esperar(fixture);
     return { fixture, el: fixture.nativeElement as HTMLElement };
   }
@@ -118,7 +119,7 @@ describe('Contas a pagar (story 11-1)', () => {
     preencher(el, 'valor', '1.000,00');
     preencher(el, 'vencimento', '2027-01-31');
     preencher(el, 'parcelas', '3');
-    preencher(el, 'fornecedor', ALFA.documento);
+    preencher(el, 'fornecedor', ALFA.id);
     await esperar(fixture);
 
     const previa = Array.from(el.querySelectorAll('[data-previa] tbody tr')).map((tr) =>
@@ -221,6 +222,139 @@ describe('Contas a pagar (story 11-1)', () => {
 
     expect(el.querySelectorAll('[data-conta]').length).toBe(2);
     expect(texto(el.querySelector('[role="status"]'))).toContain('Conta excluída');
+  });
+
+  const tabelaDaPrevia = (el: HTMLElement) =>
+    Array.from(el.querySelectorAll('[data-previa] tbody tr')).map((tr) =>
+      Array.from(tr.querySelectorAll('td')).map(texto),
+    );
+
+  it('RN-23.3: a prévia é recalculada ao mudar a quantidade de parcelas ou a data', async () => {
+    const { fixture, el } = await abrir();
+    botao(el, 'novo')!.click();
+    await esperar(fixture);
+    preencher(el, 'valor', '1.000,00');
+    preencher(el, 'vencimento', '2027-01-31');
+    preencher(el, 'parcelas', '3');
+    await esperar(fixture);
+    expect(tabelaDaPrevia(el).length).toBe(3);
+
+    preencher(el, 'parcelas', '4');
+    await esperar(fixture);
+    expect(tabelaDaPrevia(el)).toEqual([
+      ['1/4', 'R$ 250,00', '31/01/2027'],
+      ['2/4', 'R$ 250,00', '28/02/2027'],
+      ['3/4', 'R$ 250,00', '31/03/2027'],
+      ['4/4', 'R$ 250,00', '30/04/2027'],
+    ]);
+
+    preencher(el, 'vencimento', '2027-11-30');
+    preencher(el, 'parcelas', '3');
+    await esperar(fixture);
+    expect(tabelaDaPrevia(el)).toEqual([
+      ['1/3', 'R$ 333,34', '30/11/2027'],
+      ['2/3', 'R$ 333,33', '30/12/2027'],
+      ['3/3', 'R$ 333,33', '30/01/2028'],
+    ]);
+    expect(texto(el.querySelector('[data-previa] tfoot td'))).toBe('R$ 1.000,00');
+  });
+
+  it('RN-23.2: valor acima de R$ 999.999.999.999,99 é recusado na tela', async () => {
+    const { fixture, el } = await abrir();
+    botao(el, 'novo')!.click();
+    await esperar(fixture);
+    preencher(el, 'valor', '1.000.000.000.000,00');
+    botao(el, 'salvar')!.click();
+    await esperar(fixture);
+
+    expect(Array.from(el.querySelectorAll('mat-error')).map(texto)).toContain(
+      'O valor pode ser de no máximo R$ 999.999.999.999,99',
+    );
+    expect(el.querySelector('[data-previa]')).toBeNull();
+    http.expectNone((r) => r.method === 'POST');
+  });
+
+  it('fornecedor da conta é casado pelo id, mesmo com o CNPJ corrigido no Pessoas', async () => {
+    const corrigido: Fornecedor = { ...ALFA, documento: '11.444.777/0001-61' };
+    const { fixture, el } = await abrir(CENARIO_23_1, undefined, [corrigido]);
+    el.querySelectorAll<HTMLButtonElement>('[data-conta]')[0].click();
+    await esperar(fixture);
+
+    const select = el.querySelector<HTMLSelectElement>('[data-campo="fornecedor"]')!;
+    const opcoes = Array.from(select.options).map(texto);
+    expect(opcoes.filter((o) => o === 'Distribuidora Alfa').length).toBe(1);
+    expect(select.value).toBe(ALFA.id);
+
+    preencher(el, 'descricao', 'Mochilas');
+    botao(el, 'salvar')!.click();
+    const put = http.expectOne((r) => r.url === '/api/financeiro/contas/p1' && r.method === 'PUT');
+    expect(put.request.body.fornecedorDocumento).toBe(corrigido.documento);
+    put.flush({ ...CENARIO_23_1[0], descricao: 'Mochilas' });
+    await esperar(fixture);
+  });
+
+  it('busca o fornecedor pelo que é digitado (alcança além dos 50 primeiros)', async () => {
+    const zeta: Fornecedor = {
+      ...ALFA,
+      id: 'f51',
+      razaoSocial: 'Zeta Papéis',
+      documento: '11.444.777/0001-61',
+    };
+    const { fixture, el } = await abrir();
+    botao(el, 'novo')!.click();
+    await esperar(fixture);
+
+    preencher(el, 'buscaFornecedor', 'Zeta');
+    await new Promise((r) => setTimeout(r, 350));
+    const busca = http.expectOne(
+      (r) => r.url === '/api/pessoas/fornecedores' && r.params.get('busca') === 'Zeta',
+    );
+    busca.flush([zeta]);
+    await esperar(fixture);
+
+    preencher(el, 'descricao', 'Resmas');
+    preencher(el, 'categoria', MERCADORIAS.id);
+    preencher(el, 'valor', '300');
+    preencher(el, 'vencimento', '2027-01-10');
+    preencher(el, 'fornecedor', zeta.id);
+    await esperar(fixture);
+    botao(el, 'salvar')!.click();
+    const post = http.expectOne((r) => r.url === '/api/financeiro/contas' && r.method === 'POST');
+    expect(post.request.body.fornecedorDocumento).toBe(zeta.documento);
+    post.flush([], { status: 201, statusText: 'Created' });
+    await esperar(fixture);
+  });
+
+  it('conta excluída em outra sessão: no 404 do PUT sai da lista e o editor fecha', async () => {
+    const { fixture, el } = await abrir(CENARIO_23_1);
+    el.querySelectorAll<HTMLButtonElement>('[data-conta]')[1].click();
+    await esperar(fixture);
+    botao(el, 'salvar')!.click();
+    http
+      .expectOne((r) => r.url === '/api/financeiro/contas/p2' && r.method === 'PUT')
+      .flush({ mensagem: 'Conta não encontrada' }, { status: 404, statusText: 'Not Found' });
+    await esperar(fixture);
+
+    expect(el.querySelectorAll('[data-conta]').length).toBe(2);
+    expect(el.querySelector('[data-acao="salvar"]')).toBeNull();
+    expect(texto(el.querySelector('[role="alert"]'))).toBe('Conta não encontrada');
+  });
+
+  it('conta excluída em outra sessão: no 404 do DELETE sai da lista e o editor fecha', async () => {
+    const { fixture, el } = await abrir(CENARIO_23_1);
+    el.querySelectorAll<HTMLButtonElement>('[data-conta]')[2].click();
+    await esperar(fixture);
+    botao(el, 'excluir')!.click();
+    await esperar(fixture);
+    botao(el, 'excluir')!.click();
+    http
+      .expectOne((r) => r.url === '/api/financeiro/contas/p3' && r.method === 'DELETE')
+      .flush({ mensagem: 'Conta não encontrada' }, { status: 404, statusText: 'Not Found' });
+    await esperar(fixture);
+
+    expect(el.querySelectorAll('[data-conta]').length).toBe(2);
+    expect(el.querySelector('[data-acao="excluir"]')).toBeNull();
+    expect(texto(el.querySelector('[role="alert"]'))).toBe('Conta não encontrada');
   });
 
   it('sem fornecedores.gerenciar, o fornecedor é informado pelo CNPJ/CPF', async () => {

@@ -9,6 +9,9 @@ export interface ParcelaPrevia {
 /** Mesmo limite da API (story 11-1). */
 export const PARCELAS_MAXIMO = 120;
 
+/** Mesmo teto da API: o maior valor que cabe em `numeric(14,2)`. */
+export const VALOR_MAXIMO = 999_999_999_999.99;
+
 /**
  * Prévia das parcelas antes de salvar, com a regra da API (RN-23.3): valor dividido em parcelas iguais com a
  * diferença de centavos na primeira; vencimentos mensais no dia do primeiro, ou no último dia do mês que não tem
@@ -20,7 +23,14 @@ export function calcularParcelas(
   primeiroVencimento: string,
 ): ParcelaPrevia[] {
   const data = /^(\d{4})-(\d{2})-(\d{2})$/.exec(primeiroVencimento ?? '');
-  if (valor === null || !(valor > 0) || !Number.isInteger(parcelas) || !data) return [];
+  if (
+    valor === null ||
+    !(valor > 0) ||
+    valor > VALOR_MAXIMO ||
+    !Number.isInteger(parcelas) ||
+    !data
+  )
+    return [];
   const n = parcelas as number;
   if (n < 1 || n > PARCELAS_MAXIMO) return [];
 
@@ -55,7 +65,8 @@ export function lerValor(texto: string | null): number | null {
   let t = (texto ?? '').replace(/R\$/i, '').replace(/\s/g, '');
   if (!t) return null;
   if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.');
-  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
+  // Milhar só sem zero à esquerda: "0.500" não é 500 (fica recusado por ter três decimais).
+  else if (/^[1-9]\d{0,2}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '');
   if (!/^\d+(\.\d{1,2})?$/.test(t)) return null;
   return Number(t);
 }

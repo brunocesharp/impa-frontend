@@ -7,6 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Subject, debounceTime, distinctUntilChanged, from, switchMap } from 'rxjs';
 import {
   AbstractControl,
   NonNullableFormBuilder,
@@ -24,6 +25,7 @@ import { Fornecedor, PessoasService } from '../../pessoas/pessoas.service';
 import { Categoria, Conta, DadosConta, FinanceiroService } from '../financeiro.service';
 import {
   PARCELAS_MAXIMO,
+  VALOR_MAXIMO,
   calcularParcelas,
   formatarData,
   formatarMoeda,
@@ -32,13 +34,24 @@ import {
 
 const NOVA = 'nova';
 
-/** RN-23.2: valor obrigatório e maior que zero, em reais com até dois decimais. */
+/** RN-23.2: valor obrigatório e maior que zero, em reais com até dois decimais e no teto da API. */
 function valorDaConta(controle: AbstractControl<string>): ValidationErrors | null {
   if (!controle.value?.trim()) return { required: true };
   const valor = lerValor(controle.value);
   if (valor === null) return { formato: true };
-  return valor > 0 ? null : { positivo: true };
+  if (!(valor > 0)) return { positivo: true };
+  return valor > VALOR_MAXIMO ? { teto: true } : null;
 }
+
+/** Fornecedor oferecido no select: o valor do select é o `id`; a API recebe o `documento`. */
+interface OpcaoDeFornecedor {
+  id: string;
+  documento: string;
+  nome: string;
+}
+
+/** Espera depois da última tecla antes de buscar o fornecedor. */
+const ESPERA_DA_BUSCA_MS = 300;
 
 /** Formulário da conta (RN-23.2). `parcelas` só vale no lançamento (RN-23.3). */
 export function formularioDeConta(fb: NonNullableFormBuilder) {
@@ -56,7 +69,8 @@ export function formularioDeConta(fb: NonNullableFormBuilder) {
         Validators.pattern(/^\d+$/),
       ],
     ],
-    fornecedor: ['', Validators.maxLength(18)],
+    // Id do fornecedor (select) ou CNPJ/CPF digitado (campo de texto, com maxlength no template).
+    fornecedor: [''],
     numeroDocumento: ['', Validators.maxLength(60)],
     observacao: ['', Validators.maxLength(1000)],
   });
@@ -123,13 +137,28 @@ export class Contas {
       : ativas;
   });
 
-  /** Fornecedores ativos (valor = documento), mais o da conta aberta se não estiver na lista. */
+  /** Fornecedor escolhido no select: continua entre as opções quando a busca muda. */
+  private readonly escolhido = signal<OpcaoDeFornecedor | null>(null);
+
+  /**
+   * Fornecedores ativos da busca, mais o escolhido e o da conta aberta quando não estão nela. Casados pelo `id`
+   * (o CNPJ/CPF pode ter sido corrigido no Pessoas depois do lançamento); a lista do Pessoas vence, com o documento atual.
+   */
   protected readonly opcoesDeFornecedor = computed(() => {
-    const lista = this.fornecedores().map((f) => ({ documento: f.documento, nome: f.razaoSocial }));
+    const lista: OpcaoDeFornecedor[] = this.fornecedores().map((f) => ({
+      id: f.id,
+      documento: f.documento,
+      nome: f.razaoSocial,
+    }));
     const daConta = this.atual()?.fornecedor;
-    return daConta && !lista.some((f) => f.documento === daConta.documento)
-      ? [...lista, { documento: daConta.documento, nome: daConta.razaoSocial }]
-      : lista;
+    const extras: OpcaoDeFornecedor[] = [
+      ...(daConta
+        ? [{ id: daConta.id, documento: daConta.documento, nome: daConta.razaoSocial }]
+        : []),
+      ...(this.escolhido() ? [this.escolhido()!] : []),
+    ];
+    for (const extra of extras) if (!lista.some((f) => f.id === extra.id)) lista.push(extra);
+    return lista;
   });
 
   /** Prévia do lançamento (RN-23.3), recalculada a cada alteração do formulário. */
@@ -144,11 +173,35 @@ export class Contas {
     () => this.previa().reduce((soma, p) => soma + Math.round(p.valor * 100), 0) / 100,
   );
 
+  private readonly buscas = new Subject<string>();
+
   constructor() {
+    const destroy = inject(DestroyRef);
     this.formulario.valueChanges
-      .pipe(takeUntilDestroyed(inject(DestroyRef)))
+      .pipe(takeUntilDestroyed(destroy))
       .subscribe(() => this.alteracoes.update((n) => n + 1));
+    this.formulario.controls.fornecedor.valueChanges
+      .pipe(takeUntilDestroyed(destroy))
+      .subscribe((id) => {
+        if (!this.escolheFornecedor()) return;
+        this.escolhido.set(this.opcoesDeFornecedor().find((f) => f.id === id) ?? null);
+      });
+    // Busca por digitação: alcança qualquer fornecedor, não só os primeiros da lista (o Pessoas corta em 50).
+    this.buscas
+      .pipe(
+        debounceTime(ESPERA_DA_BUSCA_MS),
+        distinctUntilChanged(),
+        switchMap((busca) =>
+          from(this.pessoas.listarFornecedores(busca, false).catch(() => [] as Fornecedor[])),
+        ),
+        takeUntilDestroyed(destroy),
+      )
+      .subscribe((lista) => this.fornecedores.set(lista));
     void this.carregar();
+  }
+
+  protected buscarFornecedor(busca: string): void {
+    this.buscas.next(busca.trim());
   }
 
   protected async carregar(): Promise<void> {
@@ -181,7 +234,9 @@ export class Contas {
       valor: conta.valor.toFixed(2).replace('.', ','),
       vencimento: conta.vencimento,
       parcelas: 1,
-      fornecedor: conta.fornecedor?.documento ?? '',
+      // Select: o id do fornecedor; campo de texto: o CNPJ/CPF.
+      fornecedor:
+        (this.escolheFornecedor() ? conta.fornecedor?.id : conta.fornecedor?.documento) ?? '',
       numeroDocumento: conta.numeroDocumento ?? '',
       observacao: conta.observacao ?? '',
     });
@@ -194,6 +249,7 @@ export class Contas {
   }
 
   private prepararEdicao(): void {
+    this.escolhido.set(null);
     this.confirmandoExclusao.set(false);
     this.erro.set(null);
     this.aviso.set(null);
@@ -215,7 +271,7 @@ export class Contas {
       categoriaId: v.categoriaId,
       valor: lerValor(v.valor)!,
       vencimento: v.vencimento,
-      fornecedorDocumento: v.fornecedor.trim() || null,
+      fornecedorDocumento: this.documentoDoFornecedor(v.fornecedor),
       numeroDocumento: v.numeroDocumento.trim() || null,
       observacao: v.observacao.trim() || null,
     };
@@ -237,8 +293,12 @@ export class Contas {
         return;
       }
 
-      const resultado = await this.servico.alterarConta(this.selecionada()!, dados);
-      if (!resultado.ok) return this.erro.set(resultado.mensagem);
+      const id = this.selecionada()!;
+      const resultado = await this.servico.alterarConta(id, dados);
+      if (!resultado.ok)
+        return resultado.status === 404
+          ? this.excluidaEmOutraSessao(id, resultado.mensagem)
+          : this.erro.set(resultado.mensagem);
 
       const salva = resultado.valor;
       this.contas.update((lista) => ordenar(lista.map((c) => (c.id === salva.id ? salva : c))));
@@ -258,12 +318,29 @@ export class Contas {
     await this.executar(async () => {
       const resultado = await this.servico.excluirConta(conta.id);
       this.confirmandoExclusao.set(false);
-      if (!resultado.ok) return this.erro.set(resultado.mensagem);
+      if (!resultado.ok)
+        return resultado.status === 404
+          ? this.excluidaEmOutraSessao(conta.id, resultado.mensagem)
+          : this.erro.set(resultado.mensagem);
 
       this.contas.update((lista) => lista.filter((c) => c.id !== conta.id));
       this.selecionada.set(null);
       this.aviso.set('Conta excluída');
     });
+  }
+
+  /** A conta não existe mais (excluída em outra sessão): sai da lista e o editor fecha. */
+  private excluidaEmOutraSessao(id: string, mensagem: string): void {
+    this.contas.update((lista) => lista.filter((c) => c.id !== id));
+    this.selecionada.set(null);
+    this.erro.set(mensagem);
+  }
+
+  /** Select: o documento do fornecedor escolhido (pelo id); campo de texto: o CNPJ/CPF digitado. */
+  private documentoDoFornecedor(valor: string): string | null {
+    if (!valor.trim()) return null;
+    if (!this.escolheFornecedor()) return valor.trim();
+    return this.opcoesDeFornecedor().find((f) => f.id === valor)?.documento ?? null;
   }
 
   private async executar(acao: () => Promise<void>): Promise<void> {

@@ -1,4 +1,10 @@
-import { calcularParcelas, formatarData, formatarMoeda, lerValor } from './parcelamento';
+import {
+  VALOR_MAXIMO,
+  calcularParcelas,
+  formatarData,
+  formatarMoeda,
+  lerValor,
+} from './parcelamento';
 
 const semEspacoDuro = (texto: string) => texto.replace(/ /g, ' ');
 
@@ -54,6 +60,18 @@ describe('Parcelamento na tela (story 11-1, RN-23.3)', () => {
     expect(lerValor('')).toBeNull();
     expect(lerValor('abc')).toBeNull();
     expect(lerValor('10,001')).toBeNull();
+  });
+
+  it('milhar com zero à esquerda não é milhar', () => {
+    expect(lerValor('0.500')).toBeNull();
+    expect(lerValor('00.500')).toBeNull();
+    expect(lerValor('0.50')).toBe(0.5);
+    expect(lerValor('1.500')).toBe(1500);
+    expect(lerValor('999.999.999.999,99')).toBe(999999999999.99);
+  });
+
+  it('o teto do valor é o mesmo da API (numeric(14,2))', () => {
+    expect(VALOR_MAXIMO).toBe(999999999999.99);
   });
 
   it('formata moeda e data em pt-BR', () => {
