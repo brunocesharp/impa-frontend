@@ -80,6 +80,12 @@ button[type='submit'] {
   margin-top: 8px;
 }
 
+// Story 1-8: recuperação de senha por e-mail.
+.esqueci {
+  align-self: center;
+  margin-top: 4px;
+}
+
 // Celular: o espaço vira uma faixa no topo; o formulário ocupa o resto.
 @media (max-width: 720px) {
   .login {

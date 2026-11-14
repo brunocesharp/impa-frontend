@@ -16,6 +16,19 @@ export const routes: Routes = [
     loadComponent: () => import('./features/login/login').then((m) => m.Login),
   },
   {
+    // Story 1-8: recuperação de senha por e-mail (anônimas).
+    path: 'esqueci-senha',
+    title: 'Esqueci minha senha · IMPA',
+    loadComponent: () =>
+      import('./features/recuperar-senha/esqueci-senha').then((m) => m.EsqueciSenha),
+  },
+  {
+    path: 'redefinir-senha',
+    title: 'Nova senha · IMPA',
+    loadComponent: () =>
+      import('./features/recuperar-senha/redefinir-senha').then((m) => m.RedefinirSenha),
+  },
+  {
     path: 'trocar-senha',
     title: 'Nova senha · IMPA',
     canActivate: [trocaDeSenhaGuard],
