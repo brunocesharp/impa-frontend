@@ -4,6 +4,7 @@ import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideServiceWorker } from '@angular/service-worker';
 import { routes } from './app.routes';
 import { sessaoExpiradaInterceptor } from './core/auth/sessao-expirada.interceptor';
+import { liberacaoInterceptor } from './core/liberacao/liberacao.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -12,7 +13,8 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(
       // Antiforgery da API: cookie XSRF-TOKEN → cabeçalho X-XSRF-TOKEN nas requisições que alteram estado.
       withXsrfConfiguration({ cookieName: 'XSRF-TOKEN', headerName: 'X-XSRF-TOKEN' }),
-      withInterceptors([sessaoExpiradaInterceptor]),
+      // A liberação fica por dentro: o 401/403 final (inclusive da requisição refeita) ainda passa pelo da sessão.
+      withInterceptors([sessaoExpiradaInterceptor, liberacaoInterceptor]),
     ),
     // Service worker só para os arquivos do app (ngsw-config.json sem dataGroups): nada da API em cache (ADR-010).
     provideServiceWorker('ngsw-worker.js', {
