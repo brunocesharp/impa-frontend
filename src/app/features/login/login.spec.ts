@@ -45,6 +45,13 @@ describe('Login', () => {
 
   afterEach(() => http.verify());
 
+  it('tem o link "Esqueci minha senha" (story 1-8)', async () => {
+    const fixture = await abrirTela();
+    const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>('a[href="/esqueci-senha"]');
+
+    expect(link?.textContent?.trim()).toBe('Esqueci minha senha');
+  });
+
   it('erro 401 do login mostra "Usuário ou senha inválidos"', async () => {
     const fixture = await abrirTela();
     const elemento = fixture.nativeElement as HTMLElement;
