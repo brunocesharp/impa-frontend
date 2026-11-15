@@ -65,9 +65,34 @@ describe('RedefinirSenha (story 1-8)', () => {
     const requisicao = await redefinicao();
     expect(requisicao.request.body).toEqual({ token: 'abc-123', novaSenha: 'novasenha26' });
     requisicao.flush(null, { status: 204, statusText: 'No Content' });
+    // Depois de redefinir, confere a sessão: a deste navegador (se havia) era de Ana e foi encerrada.
+    (await vi.waitFor(() => http.expectOne('/api/auth/me'))).flush(null, {
+      status: 401,
+      statusText: 'Unauthorized',
+    });
 
     await vi.waitFor(() => expect(navegar).toHaveBeenCalledWith('/login'));
     expect(TestBed.inject(AuthService).aviso()).toBe(MENSAGEM_SENHA_REDEFINIDA);
+  });
+
+  it('com outro usuário logado neste navegador, ele continua no sistema (R6)', async () => {
+    const fixture = abrirTela('token=abc-123');
+    const elemento = fixture.nativeElement as HTMLElement;
+
+    preencherESalvar(elemento, 'novasenha26');
+    (await redefinicao()).flush(null, { status: 204, statusText: 'No Content' });
+    (await vi.waitFor(() => http.expectOne('/api/auth/me'))).flush({
+      usuario: 'operador',
+      nome: 'Operador',
+      perfil: 'Operador de caixa',
+      permissoes: [],
+      trocaDeSenhaObrigatoria: false,
+    });
+
+    await vi.waitFor(() => expect(navegar).toHaveBeenCalledWith('/'));
+    const auth = TestBed.inject(AuthService);
+    expect(auth.autenticado()).toBe(true);
+    expect(auth.aviso()).toBeNull();
   });
 
   it('tira o token da barra de endereço ao abrir', () => {

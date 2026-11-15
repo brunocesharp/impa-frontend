@@ -2,7 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
-import { ErroApi, MENSAGEM_MUITAS_TENTATIVAS } from '../../core/auth/sessao';
+import { ErroApi } from '../../core/auth/sessao';
 
 /** Mensagem fixa depois do pedido, exista ou não o usuário (cenário 1.10, RN-1.11). */
 export const MENSAGEM_PEDIDO_RECEBIDO =
@@ -11,13 +11,20 @@ export const MENSAGEM_PEDIDO_RECEBIDO =
 /** Link vencido, já usado ou adulterado (cenário 1.9). */
 export const MENSAGEM_LINK_INVALIDO = 'Link inválido ou expirado';
 
+/**
+ * 429 do limite próprio da recuperação (`limite-de-recuperacao`): a mesma mensagem do servidor, usada quando a
+ * resposta vem sem corpo. Neutra, sem "de entrar": a pessoa não está entrando (R5 da revisão 1).
+ */
+export const MENSAGEM_MUITOS_PEDIDOS = 'Muitas tentativas. Aguarde um minuto e tente novamente';
+
 /** Aviso do login depois de redefinir. */
 export const MENSAGEM_SENHA_REDEFINIDA = 'Senha redefinida. Entre com a nova senha.';
 
 export type ResultadoPedido = { ok: true } | { ok: false; mensagem: string };
 
 export type ResultadoRedefinicao =
-  | { ok: true }
+  /** `sessaoMantida`: a sessão deste navegador era de outro usuário e continua aberta. */
+  | { ok: true; sessaoMantida: boolean }
   | { ok: false; linkInvalido: true }
   | { ok: false; linkInvalido: false; novaSenha?: string; mensagem?: string };
 
@@ -38,7 +45,7 @@ export class RecuperarSenhaService {
     } catch (erro) {
       if (!(erro instanceof HttpErrorResponse)) throw erro;
       if (erro.status === 429)
-        return { ok: false, mensagem: mensagemDe(erro) ?? MENSAGEM_MUITAS_TENTATIVAS };
+        return { ok: false, mensagem: mensagemDe(erro) ?? MENSAGEM_MUITOS_PEDIDOS };
       if (erro.status === 400) {
         const errors = errosDe(erro);
         const primeira = errors && Object.values(errors).flat()[0];
@@ -61,7 +68,7 @@ export class RecuperarSenhaService {
         return {
           ok: false,
           linkInvalido: false,
-          mensagem: mensagemDe(erro) ?? MENSAGEM_MUITAS_TENTATIVAS,
+          mensagem: mensagemDe(erro) ?? MENSAGEM_MUITOS_PEDIDOS,
         };
       }
       if (erro.status === 400) {
@@ -83,9 +90,19 @@ export class RecuperarSenhaService {
       throw erro;
     }
 
-    // As sessões abertas foram encerradas no servidor (inclusive a deste navegador, se havia).
+    // As sessões abertas do dono do link foram encerradas no servidor, inclusive a deste navegador se era dele. A de
+    // outro usuário logado aqui (ex.: o operador do caixa) continua aberta (R6 da revisão 1): confere quem ficou.
+    if (await this.sessaoContinuaAberta()) return { ok: true, sessaoMantida: true };
     this.auth.encerrarLocalmente(MENSAGEM_SENHA_REDEFINIDA);
-    return { ok: true };
+    return { ok: true, sessaoMantida: false };
+  }
+
+  private async sessaoContinuaAberta(): Promise<boolean> {
+    try {
+      return (await this.auth.carregarSessao()) !== null;
+    } catch {
+      return false; // a senha já foi trocada: sem resposta sobre a sessão, segue como se tivesse saído
+    }
   }
 }
 

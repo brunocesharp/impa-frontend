@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { EsqueciSenha } from './esqueci-senha';
-import { MENSAGEM_PEDIDO_RECEBIDO } from './recuperar-senha.service';
+import { MENSAGEM_MUITOS_PEDIDOS, MENSAGEM_PEDIDO_RECEBIDO } from './recuperar-senha.service';
 
 describe('EsqueciSenha (story 1-8)', () => {
   let http: HttpTestingController;
@@ -81,17 +81,38 @@ describe('EsqueciSenha (story 1-8)', () => {
 
     preencherEEnviar(elemento, 'ana');
     await responderSessao();
+    // Corpo real do limite-de-recuperacao (LimiteDeLogin.MensagemMuitosPedidos no backend).
     (await vi.waitFor(() => http.expectOne('/api/auth/esqueci-senha'))).flush(
-      { mensagem: 'Muitas tentativas. Aguarde um minuto' },
+      { mensagem: 'Muitas tentativas. Aguarde um minuto e tente novamente' },
       { status: 429, statusText: 'Too Many Requests' },
     );
 
     await vi.waitFor(async () => {
       await fixture.whenStable();
       expect(elemento.querySelector('[role="alert"]')?.textContent).toContain(
-        'Muitas tentativas. Aguarde um minuto',
+        'Muitas tentativas. Aguarde um minuto e tente novamente',
       );
     });
+  });
+
+  it('429 sem corpo mostra a mensagem neutra, sem "de entrar"', async () => {
+    const fixture = abrirTela();
+    const elemento = fixture.nativeElement as HTMLElement;
+
+    preencherEEnviar(elemento, 'ana');
+    await responderSessao();
+    (await vi.waitFor(() => http.expectOne('/api/auth/esqueci-senha'))).flush(null, {
+      status: 429,
+      statusText: 'Too Many Requests',
+    });
+
+    await vi.waitFor(async () => {
+      await fixture.whenStable();
+      const alerta = elemento.querySelector('[role="alert"]')?.textContent ?? '';
+      expect(alerta).toContain(MENSAGEM_MUITOS_PEDIDOS);
+      expect(alerta).not.toContain('de entrar');
+    });
+    expect(MENSAGEM_MUITOS_PEDIDOS).toBe('Muitas tentativas. Aguarde um minuto e tente novamente');
   });
 
   it('tem o caminho de volta ao login', () => {

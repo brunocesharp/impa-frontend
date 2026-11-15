@@ -159,7 +159,8 @@ export class RedefinirSenha {
         this.formulario.getRawValue().novaSenha,
       );
       if (resultado.ok) {
-        await this.router.navigateByUrl('/login');
+        // Outro usuário logado neste navegador continua no sistema; senão, volta ao login com o aviso.
+        await this.router.navigateByUrl(resultado.sessaoMantida ? '/' : '/login');
       } else if (resultado.linkInvalido) {
         this.linkInvalido.set(true);
       } else if (resultado.novaSenha) {
